@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Políticas RLS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Políticas RLS</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testRLS() {
+            addResult('🚀 Testando políticas RLS...', 'info');
+            
+            const supabaseUrl = 'https://dgkzxadlmiafbegmdxcz.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna3p4YWRsbWlhZmJlZ21keGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3OTI0OTUsImV4cCI6MjA2OTM2ODQ5NX0.MyYN4cA5pLsKb1uklQRIpX1rEuahBj4DZFcp1ljgvss';
+            
+            // Teste 1: Buscar usuários sem filtro
+            try {
+                addResult('📡 Testando busca de usuários sem filtro...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*&limit=5`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Usuários encontrados: ${data.length}`, 'success');
+                    if (data.length > 0) {
+                        addResult(`📋 Primeiro usuário: ${data[0].name} (${data[0].user_type})`, 'info');
+                    }
+                } else {
+                    addResult(`❌ Erro na busca: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+
+            // Teste 2: Buscar usuários profissionais
+            try {
+                addResult('📡 Testando busca de usuários profissionais...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*&user_type=eq.profissional&limit=5`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Profissionais encontrados: ${data.length}`, 'success');
+                    if (data.length > 0) {
+                        addResult(`📋 Primeiro profissional: ${data[0].name}`, 'info');
+                    }
+                } else {
+                    addResult(`❌ Erro na busca de profissionais: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Erro na requisição de profissionais: ${error.message}`, 'error');
+            }
+
+            // Teste 3: Verificar se há dados na tabela
+            try {
+                addResult('📡 Verificando total de usuários na tabela...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Prefer': 'count=exact'
+                    }
+                });
+                
+                const totalCount = response.headers.get('content-range');
+                addResult(`📊 Total de usuários: ${totalCount || 'N/A'}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`📋 Dados retornados: ${data.length} registros`, 'info');
+                }
+            } catch (error) {
+                addResult(`❌ Erro ao verificar total: ${error.message}`, 'error');
+            }
+
+            addResult('🏁 Testes RLS concluídos!', 'info');
+        }
+
+        // Executar testes quando a página carregar
+        window.addEventListener('load', testRLS);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+

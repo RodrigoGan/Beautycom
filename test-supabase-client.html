@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Cliente Supabase</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Teste Cliente Supabase</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testSupabaseClient() {
+            addResult('🚀 Testando cliente Supabase...', 'info');
+            
+            // Configuração do Supabase
+            const supabaseUrl = 'https://dgkzxadlmiafbegmdxcz.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna3p4YWRsbWlhZmJlZ21keGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3OTI0OTUsImV4cCI6MjA2OTM2ODQ5NX0.MyYN4cA5pLsKb1uklQRIpX1rEuahBj4DZFcp1ljgvss';
+            
+            try {
+                // Criar cliente Supabase
+                const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+                addResult('✅ Cliente Supabase criado com sucesso', 'success');
+                
+                // Teste 1: Buscar usuários
+                addResult('📡 Testando busca de usuários...', 'info');
+                const { data: users, error: usersError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .limit(5);
+                
+                if (usersError) {
+                    addResult(`❌ Erro ao buscar usuários: ${usersError.message}`, 'error');
+                } else {
+                    addResult(`✅ Usuários encontrados: ${users?.length || 0}`, 'success');
+                    if (users && users.length > 0) {
+                        addResult(`📋 Primeiro usuário: ${users[0].name} (${users[0].user_type})`, 'info');
+                    }
+                }
+                
+                // Teste 2: Buscar usuários profissionais
+                addResult('📡 Testando busca de profissionais...', 'info');
+                const { data: professionals, error: profError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('user_type', 'profissional')
+                    .limit(5);
+                
+                if (profError) {
+                    addResult(`❌ Erro ao buscar profissionais: ${profError.message}`, 'error');
+                } else {
+                    addResult(`✅ Profissionais encontrados: ${professionals?.length || 0}`, 'success');
+                    if (professionals && professionals.length > 0) {
+                        addResult(`📋 Primeiro profissional: ${professionals[0].name}`, 'info');
+                    }
+                }
+                
+                // Teste 3: Verificar se há dados na tabela
+                addResult('📡 Verificando total de usuários...', 'info');
+                const { count, error: countError } = await supabase
+                    .from('users')
+                    .select('*', { count: 'exact', head: true });
+                
+                if (countError) {
+                    addResult(`❌ Erro ao contar usuários: ${countError.message}`, 'error');
+                } else {
+                    addResult(`📊 Total de usuários na tabela: ${count || 0}`, 'success');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Erro geral: ${error.message}`, 'error');
+            }
+
+            addResult('🏁 Testes do cliente Supabase concluídos!', 'info');
+        }
+
+        // Executar testes quando a página carregar
+        window.addEventListener('load', testSupabaseClient);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Supabase Final</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4caf50; background: #f1f8e9; }
+        .error { border-color: #f44336; background: #ffebee; }
+        .loading { border-color: #ff9800; background: #fff3e0; }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1976d2; }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .user-item {
+            background: #f9f9f9;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 3px solid #2196f3;
+        }
+        .config-input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste Supabase Final</h1>
+        <p>Este teste usa o proxy para conectar ao Supabase com suas credenciais reais.</p>
+        
+        <div class="test-section">
+            <h3>1. Configuração</h3>
+            <p>URL do Supabase:</p>
+            <input type="text" id="supabaseUrl" class="config-input" placeholder="https://seu-projeto.supabase.co">
+            <p>Chave Anônima:</p>
+            <input type="text" id="supabaseKey" class="config-input" placeholder="sua-chave-anonima">
+            <button onclick="saveConfig()">Salvar Configuração</button>
+        </div>
+        
+        <div class="test-section" id="connectionTest">
+            <h3>2. Teste de Conexão</h3>
+            <button onclick="testConnection()">Testar Conexão</button>
+            <div id="connectionResult"></div>
+        </div>
+        
+        <div class="test-section" id="usersTest">
+            <h3>3. Teste de Busca de Usuários</h3>
+            <button onclick="testUsersQuery()">Buscar Usuários</button>
+            <div id="usersResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Logs</h3>
+            <div id="logs" class="log"></div>
+            <button onclick="clearLogs()">Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        let SUPABASE_URL = localStorage.getItem('supabaseUrl') || ''
+        let SUPABASE_ANON_KEY = localStorage.getItem('supabaseKey') || ''
+        
+        function log(message) {
+            const logsDiv = document.getElementById('logs')
+            const timestamp = new Date().toLocaleTimeString()
+            logsDiv.innerHTML += `[${timestamp}] ${message}\n`
+            logsDiv.scrollTop = logsDiv.scrollHeight
+            console.log(message)
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = ''
+        }
+        
+        function updateResult(elementId, message, type = 'loading') {
+            const element = document.getElementById(elementId)
+            element.innerHTML = `<div class="${type}">${message}</div>`
+        }
+        
+        function saveConfig() {
+            SUPABASE_URL = document.getElementById('supabaseUrl').value.trim()
+            SUPABASE_ANON_KEY = document.getElementById('supabaseKey').value.trim()
+            
+            localStorage.setItem('supabaseUrl', SUPABASE_URL)
+            localStorage.setItem('supabaseKey', SUPABASE_ANON_KEY)
+            
+            log('✅ Configuração salva!')
+            log(`🌐 URL: ${SUPABASE_URL}`)
+            log(`🔑 Chave: ${SUPABASE_ANON_KEY ? 'Configurada' : 'Não configurada'}`)
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Iniciando teste Supabase final...')
+            
+            // Carregar configuração salva
+            document.getElementById('supabaseUrl').value = SUPABASE_URL
+            document.getElementById('supabaseKey').value = SUPABASE_ANON_KEY
+            
+            if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+                log('✅ Configuração carregada do localStorage')
+            } else {
+                log('⚠️ Configure as credenciais do Supabase acima')
+            }
+        })
+        
+        async function testConnection() {
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                updateResult('connectionResult', '❌ Configure as credenciais primeiro', 'error')
+                return
+            }
+            
+            updateResult('connectionResult', 'Testando conexão...', 'loading')
+            log('📡 Testando conexão com Supabase via proxy...')
+            
+            try {
+                const startTime = Date.now()
+                
+                // Teste via proxy
+                const response = await fetch('/api/supabase/rest/v1/users?select=count&limit=1', {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                
+                const endTime = Date.now()
+                const responseTime = endTime - startTime
+                
+                if (response.ok) {
+                    log(`✅ Conexão bem-sucedida! Status: ${response.status} (${responseTime}ms)`)
+                    updateResult('connectionResult', `✅ Sucesso! Status: ${response.status} (${responseTime}ms)`, 'success')
+                } else {
+                    const errorText = await response.text()
+                    log(`❌ Erro na conexão: Status ${response.status} - ${errorText}`)
+                    updateResult('connectionResult', `❌ Erro: Status ${response.status}`, 'error')
+                }
+            } catch (error) {
+                log(`❌ Erro geral: ${error.message}`)
+                updateResult('connectionResult', `❌ Erro: ${error.message}`, 'error')
+            }
+        }
+        
+        async function testUsersQuery() {
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                updateResult('usersResult', '❌ Configure as credenciais primeiro', 'error')
+                return
+            }
+            
+            updateResult('usersResult', 'Buscando usuários...', 'loading')
+            log('🔍 Testando busca de usuários via proxy...')
+            
+            try {
+                const startTime = Date.now()
+                
+                // Query via proxy
+                const response = await fetch('/api/supabase/rest/v1/users?select=*&user_type=eq.profissional&order=created_at.desc&limit=12', {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                
+                const endTime = Date.now()
+                const responseTime = endTime - startTime
+                
+                if (response.ok) {
+                    const data = await response.json()
+                    log(`✅ Busca bem-sucedida! Status: ${response.status} (${responseTime}ms)`)
+                    log(`📊 Resultados: ${data?.length || 0} usuários encontrados`)
+                    
+                    if (data && data.length > 0) {
+                        log('👥 Primeiros usuários:')
+                        data.slice(0, 3).forEach((user, index) => {
+                            log(`  ${index + 1}. ${user.name} (@${user.nickname}) - ${user.user_type}`)
+                        })
+                        
+                        let resultHtml = `<div class="success">
+                            <p>✅ ${data.length} usuários encontrados (${responseTime}ms)</p>
+                            <h4>Primeiros usuários:</h4>
+                        `
+                        
+                        data.slice(0, 5).forEach(user => {
+                            resultHtml += `
+                                <div class="user-item">
+                                    <strong>${user.name}</strong> (@${user.nickname})<br>
+                                    <small>Tipo: ${user.user_type} | Cidade: ${user.cidade || 'N/A'}</small>
+                                </div>
+                            `
+                        })
+                        
+                        resultHtml += '</div>'
+                        updateResult('usersResult', resultHtml, 'success')
+                    } else {
+                        log('⚠️ Nenhum usuário encontrado')
+                        updateResult('usersResult', `
+                            <div class="error">
+                                <p>⚠️ Nenhum usuário encontrado</p>
+                                <p>Possíveis causas:</p>
+                                <ul>
+                                    <li>Não há usuários com user_type = 'profissional'</li>
+                                    <li>Políticas RLS bloqueando acesso</li>
+                                    <li>Credenciais incorretas</li>
+                                </ul>
+                            </div>
+                        `, 'error')
+                    }
+                } else {
+                    const errorText = await response.text()
+                    log(`❌ Erro na busca: Status ${response.status} - ${errorText}`)
+                    updateResult('usersResult', `❌ Erro: Status ${response.status}`, 'error')
+                }
+            } catch (error) {
+                log(`❌ Erro geral: ${error.message}`)
+                updateResult('usersResult', `❌ Erro: ${error.message}`, 'error')
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

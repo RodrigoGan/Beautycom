@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Supabase Real</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4caf50; background: #f1f8e9; }
+        .error { border-color: #f44336; background: #ffebee; }
+        .loading { border-color: #ff9800; background: #fff3e0; }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1976d2; }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .user-item {
+            background: #f9f9f9;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 3px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Teste Supabase Real</h1>
+        <p>Este teste usa o Supabase real com as credenciais do projeto.</p>
+        
+        <div class="test-section">
+            <h3>1. Configuração</h3>
+            <p>URL: <span id="supabaseUrl">Carregando...</span></p>
+            <p>Chave: <span id="supabaseKey">Carregando...</span></p>
+        </div>
+        
+        <div class="test-section" id="connectionTest">
+            <h3>2. Teste de Conexão Básica</h3>
+            <button onclick="testBasicConnection()">Testar Conexão Básica</button>
+            <div id="basicConnectionResult"></div>
+        </div>
+        
+        <div class="test-section" id="usersTest">
+            <h3>3. Teste de Busca de Usuários</h3>
+            <button onclick="testUsersQuery()">Buscar Usuários Profissionais</button>
+            <div id="usersResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Logs</h3>
+            <div id="logs" class="log"></div>
+            <button onclick="clearLogs()">Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuração do Supabase (substitua pelas suas credenciais reais)
+        const SUPABASE_URL = 'https://your-project.supabase.co'
+        const SUPABASE_ANON_KEY = 'your-anon-key'
+        
+        let supabase = null
+        
+        function log(message) {
+            const logsDiv = document.getElementById('logs')
+            const timestamp = new Date().toLocaleTimeString()
+            logsDiv.innerHTML += `[${timestamp}] ${message}\n`
+            logsDiv.scrollTop = logsDiv.scrollHeight
+            console.log(message)
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = ''
+        }
+        
+        function updateResult(elementId, message, type = 'loading') {
+            const element = document.getElementById(elementId)
+            element.innerHTML = `<div class="${type}">${message}</div>`
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Iniciando teste com Supabase real...')
+            
+            // Mostrar configuração
+            document.getElementById('supabaseUrl').textContent = SUPABASE_URL
+            document.getElementById('supabaseKey').textContent = SUPABASE_ANON_KEY ? 'Configurada' : 'Não configurada'
+            
+            // Criar cliente Supabase usando fetch direto (sem CDN)
+            try {
+                // Usar fetch direto para criar o cliente Supabase
+                log('✅ Inicializando cliente Supabase...')
+            } catch (error) {
+                log(`❌ Erro ao inicializar: ${error.message}`)
+                updateResult('basicConnectionResult', 'Erro na inicialização', 'error')
+            }
+        })
+        
+        async function testBasicConnection() {
+            updateResult('basicConnectionResult', 'Testando conexão...', 'loading')
+            log('📡 Testando conexão básica com Supabase...')
+            
+            try {
+                const startTime = Date.now()
+                
+                // Teste direto com fetch para a API do Supabase
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/users?select=count&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                
+                const endTime = Date.now()
+                const responseTime = endTime - startTime
+                
+                if (response.ok) {
+                    log(`✅ Conexão básica bem-sucedida! Status: ${response.status} (${responseTime}ms)`)
+                    updateResult('basicConnectionResult', `✅ Sucesso! Status: ${response.status} (${responseTime}ms)`, 'success')
+                } else {
+                    const errorText = await response.text()
+                    log(`❌ Erro na conexão: Status ${response.status} - ${errorText}`)
+                    updateResult('basicConnectionResult', `❌ Erro: Status ${response.status}`, 'error')
+                }
+            } catch (error) {
+                log(`❌ Erro geral: ${error.message}`)
+                updateResult('basicConnectionResult', `❌ Erro: ${error.message}`, 'error')
+            }
+        }
+        
+        async function testUsersQuery() {
+            updateResult('usersResult', 'Buscando usuários...', 'loading')
+            log('🔍 Testando busca de usuários profissionais...')
+            
+            try {
+                const startTime = Date.now()
+                
+                // Query direta para a API do Supabase
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/users?select=*&user_type=eq.profissional&order=created_at.desc&limit=12`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                
+                const endTime = Date.now()
+                const responseTime = endTime - startTime
+                
+                if (response.ok) {
+                    const data = await response.json()
+                    log(`✅ Busca bem-sucedida! Status: ${response.status} (${responseTime}ms)`)
+                    log(`📊 Resultados: ${data?.length || 0} usuários encontrados`)
+                    
+                    if (data && data.length > 0) {
+                        log('👥 Primeiros usuários:')
+                        data.slice(0, 3).forEach((user, index) => {
+                            log(`  ${index + 1}. ${user.name} (@${user.nickname}) - ${user.user_type}`)
+                        })
+                        
+                        let resultHtml = `<div class="success">
+                            <p>✅ ${data.length} usuários encontrados (${responseTime}ms)</p>
+                            <h4>Primeiros usuários:</h4>
+                        `
+                        
+                        data.slice(0, 5).forEach(user => {
+                            resultHtml += `
+                                <div class="user-item">
+                                    <strong>${user.name}</strong> (@${user.nickname})<br>
+                                    <small>Tipo: ${user.user_type} | Cidade: ${user.cidade || 'N/A'}</small>
+                                </div>
+                            `
+                        })
+                        
+                        resultHtml += '</div>'
+                        updateResult('usersResult', resultHtml, 'success')
+                    } else {
+                        log('⚠️ Nenhum usuário encontrado')
+                        updateResult('usersResult', `
+                            <div class="error">
+                                <p>⚠️ Nenhum usuário encontrado</p>
+                                <p>Possíveis causas:</p>
+                                <ul>
+                                    <li>Não há usuários com user_type = 'profissional'</li>
+                                    <li>Políticas RLS bloqueando acesso</li>
+                                </ul>
+                            </div>
+                        `, 'error')
+                    }
+                } else {
+                    const errorText = await response.text()
+                    log(`❌ Erro na busca: Status ${response.status} - ${errorText}`)
+                    updateResult('usersResult', `❌ Erro: Status ${response.status}`, 'error')
+                }
+            } catch (error) {
+                log(`❌ Erro geral: ${error.message}`)
+                updateResult('usersResult', `❌ Erro: ${error.message}`, 'error')
+            }
+        }
+    </script>
+</body>
+</html>
+
+

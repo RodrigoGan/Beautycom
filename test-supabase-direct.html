@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Supabase Direto</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4caf50; background: #f1f8e9; }
+        .error { border-color: #f44336; background: #ffebee; }
+        .loading { border-color: #ff9800; background: #fff3e0; }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1976d2; }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste Supabase Direto</h1>
+        <p>Este teste faz requisição direta para o Supabase (sem proxy).</p>
+        
+        <div class="test-section">
+            <h3>1. Teste Direto</h3>
+            <button onclick="testDirect()">Testar Conexão Direta</button>
+            <div id="directResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Logs</h3>
+            <div id="logs" class="log"></div>
+            <button onclick="clearLogs()">Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://dgkzxadlmiafbegmdxcz.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna3p4YWRsbWlhZmJlZ21keGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzE5NzQsImV4cCI6MjA1MDU0Nzk3NH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8'
+        
+        function log(message) {
+            const logsDiv = document.getElementById('logs')
+            const timestamp = new Date().toLocaleTimeString()
+            logsDiv.innerHTML += `[${timestamp}] ${message}\n`
+            logsDiv.scrollTop = logsDiv.scrollHeight
+            console.log(message)
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = ''
+        }
+        
+        function updateResult(elementId, message, type = 'loading') {
+            const element = document.getElementById(elementId)
+            element.innerHTML = `<div class="${type}">${message}</div>`
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Iniciando teste Supabase direto...')
+            log(`🌐 URL: ${SUPABASE_URL}`)
+        })
+        
+        async function testDirect() {
+            updateResult('directResult', 'Testando conexão direta...', 'loading')
+            log('📡 Testando conexão direta com Supabase...')
+            
+            try {
+                const startTime = Date.now()
+                
+                // Teste direto
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/users?select=count&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                
+                const endTime = Date.now()
+                const responseTime = endTime - startTime
+                
+                log(`📊 Status: ${response.status} (${responseTime}ms)`)
+                log(`📊 Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
+                
+                if (response.ok) {
+                    const data = await response.json()
+                    log(`✅ Conexão bem-sucedida! Dados: ${JSON.stringify(data)}`)
+                    updateResult('directResult', `✅ Sucesso! Status: ${response.status} (${responseTime}ms)`, 'success')
+                } else {
+                    const errorText = await response.text()
+                    log(`❌ Erro na conexão: Status ${response.status} - ${errorText}`)
+                    updateResult('directResult', `❌ Erro: Status ${response.status}`, 'error')
+                }
+            } catch (error) {
+                log(`❌ Erro geral: ${error.message}`)
+                updateResult('directResult', `❌ Erro: ${error.message}`, 'error')
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

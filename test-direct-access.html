@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Acesso Direto</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Acesso Direto aos Dados</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+        }
+
+        async function testDirectAccess() {
+            addResult('🚀 Testando acesso direto aos dados...', 'info');
+            
+            const supabaseUrl = 'https://dgkzxadlmiafbegmdxcz.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna3p4YWRsbWlhZmJlZ21keGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3OTI0OTUsImV4cCI6MjA2OTM2ODQ5NX0.MyYN4cA5pLsKb1uklQRIpX1rEuahBj4DZFcp1ljgvss';
+            
+            // Teste 1: Acesso direto sem filtros
+            try {
+                addResult('📡 Testando acesso direto sem filtros...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*&limit=5`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addResult(`📊 Status da resposta: ${response.status}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Dados retornados: ${data.length} registros`, 'success');
+                    if (data.length > 0) {
+                        addResult(`📋 Primeiro registro: ${JSON.stringify(data[0], null, 2)}`, 'info');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    addResult(`❌ Erro na resposta: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+
+            // Teste 2: Acesso com filtro de tipo de usuário
+            try {
+                addResult('📡 Testando acesso com filtro profissional...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*&user_type=eq.profissional&limit=5`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addResult(`📊 Status da resposta: ${response.status}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Profissionais retornados: ${data.length} registros`, 'success');
+                    if (data.length > 0) {
+                        addResult(`📋 Primeiro profissional: ${JSON.stringify(data[0], null, 2)}`, 'info');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    addResult(`❌ Erro na resposta: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+
+            // Teste 3: Verificar headers da resposta
+            try {
+                addResult('📡 Verificando headers da resposta...', 'info');
+                const response = await fetch(`${supabaseUrl}/rest/v1/users?select=*&limit=1`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addResult(`📊 Status: ${response.status}`, 'info');
+                addResult(`📊 Content-Type: ${response.headers.get('content-type')}`, 'info');
+                addResult(`📊 Content-Range: ${response.headers.get('content-range')}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Dados: ${data.length} registros`, 'success');
+                }
+            } catch (error) {
+                addResult(`❌ Erro: ${error.message}`, 'error');
+            }
+
+            addResult('🏁 Testes de acesso direto concluídos!', 'info');
+        }
+
+        // Executar testes quando a página carregar
+        window.addEventListener('load', testDirectAccess);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+

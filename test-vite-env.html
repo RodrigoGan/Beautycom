@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Variáveis de Ambiente</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste Variáveis de Ambiente Vite</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+        }
+
+        function testEnvVars() {
+            addResult('🚀 Verificando variáveis de ambiente...', 'info');
+            
+            // Verificar se as variáveis estão disponíveis
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            
+            addResult(`📡 VITE_SUPABASE_URL: ${supabaseUrl ? '✅ Definida' : '❌ Não definida'}`, supabaseUrl ? 'success' : 'error');
+            addResult(`📡 VITE_SUPABASE_ANON_KEY: ${supabaseKey ? '✅ Definida' : '❌ Não definida'}`, supabaseKey ? 'success' : 'error');
+            
+            if (supabaseUrl) {
+                addResult(`🔗 URL: ${supabaseUrl}`, 'info');
+            }
+            
+            if (supabaseKey) {
+                addResult(`🔑 Chave: ${supabaseKey.substring(0, 20)}...`, 'info');
+            }
+            
+            // Testar se conseguimos fazer uma requisição com as variáveis
+            if (supabaseUrl && supabaseKey) {
+                addResult('📡 Testando requisição com variáveis do Vite...', 'info');
+                
+                fetch(`${supabaseUrl}/rest/v1/users?select=*&limit=1`, {
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error(`Status: ${response.status}`);
+                    }
+                })
+                .then(data => {
+                    addResult(`✅ Requisição OK! Dados: ${data.length} registros`, 'success');
+                })
+                .catch(error => {
+                    addResult(`❌ Erro na requisição: ${error.message}`, 'error');
+                });
+            } else {
+                addResult('❌ Não é possível testar requisição - variáveis não definidas', 'error');
+            }
+        }
+
+        // Executar testes quando a página carregar
+        window.addEventListener('load', testEnvVars);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
