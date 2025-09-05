@@ -26,6 +26,7 @@ import ConfiguracoesAgenda from "./pages/ConfiguracoesAgenda";
 import AgendaCompleta from "./pages/AgendaCompleta";
 import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
+import AreaAdministrativa from "./pages/AreaAdministrativa";
 // import { PerformanceDebug, usePerformanceDebug } from "./components/PerformanceDebug"; // DESABILITADO para reduzir requisições
 // import { SalonDebug } from "./components/SalonDebug";
 
@@ -70,6 +71,11 @@ const App = () => {
             <Route path="/agenda-pessoal" element={
               <ProtectedRoute>
                 <AgendaPessoal />
+              </ProtectedRoute>
+            } />
+            <Route path="/area-administrativa" element={
+              <ProtectedRoute>
+                <AreaAdministrativa />
               </ProtectedRoute>
             } />
             <Route path="/novo-agendamento" element={

@@ -28,6 +28,13 @@ const Login = () => {
     setError("")
     console.log('🔄 Iniciando processo de login...')
     
+    // Timeout de segurança para evitar travamento
+    const timeoutId = setTimeout(() => {
+      console.error('❌ Timeout no login - forçando reset')
+      setLoading(false)
+      setError("Tempo limite excedido. Tente novamente.")
+    }, 15000) // 15 segundos
+    
     try {
       console.log('🔄 Chamando signIn...')
       const { data, error } = await signIn(email, password)
@@ -44,7 +51,15 @@ const Login = () => {
       
       if (data?.user) {
         console.log('✅ Login bem-sucedido, redirecionando...')
-        navigate("/beautywall")
+        console.log('✅ Usuário:', data.user.email)
+        console.log('✅ Tipo de usuário:', data.user.user_metadata?.user_type || 'usuario')
+        
+        // Redirecionar baseado no tipo de usuário
+        const userType = data.user.user_metadata?.user_type || 'usuario'
+        const redirectPath = userType === 'profissional' ? '/agenda-profissional' : '/beautywall'
+        
+        console.log('✅ Redirecionando para:', redirectPath)
+        navigate(redirectPath)
         console.log('✅ Redirecionamento executado')
       } else {
         console.warn('⚠️ Login sem dados de usuário')
@@ -70,6 +85,7 @@ const Login = () => {
       
       setError(errorMessage)
     } finally {
+      clearTimeout(timeoutId)
       console.log('🏁 Finalizando processo de login')
       setLoading(false)
     }

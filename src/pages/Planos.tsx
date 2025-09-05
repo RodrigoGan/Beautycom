@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { BackButton } from "@/components/ui/back-button"
 import { Check, Star, Calendar, Bell, Users, BarChart3, Smartphone } from "lucide-react"
+import { Header } from "@/components/Header"
 import plansImage from "@/assets/plans-beauty.jpg"
 
 const Planos = () => {
@@ -44,7 +45,7 @@ const Planos = () => {
     {
       id: "plus",
       nome: "BeautyTime Plus",
-      preco: "69,90",
+      preco: "89,90",
       periodo: "mês", 
       descricao: "Para salões estabelecidos",
       profissionais: "Até 10 profissionais",
@@ -60,8 +61,11 @@ const Planos = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-subtle pt-20 pb-8">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-subtle">
+      {/* Header */}
+      <Header />
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8">
         {/* Botão Voltar */}
         <div className="mb-6">
           <BackButton 
@@ -134,7 +138,7 @@ const Planos = () => {
             <CardTitle className="text-2xl">BeautyTime Ad</CardTitle>
             <CardDescription>Adicione mais profissionais ao seu plano Plus</CardDescription>
             <div className="mt-4">
-              <span className="text-3xl font-bold text-primary">R$ 9,90</span>
+              <span className="text-3xl font-bold text-primary">R$ 29,90</span>
               <span className="text-muted-foreground">/profissional adicional</span>
             </div>
           </CardHeader>

@@ -25,14 +25,15 @@ interface CalendarViewProps {
   className?: string
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({
-  appointments,
-  selectedDate,
-  onDateSelect,
-  onAppointmentClick,
-  loading = false,
-  className = ''
-}) => {
+export const CalendarView: React.FC<CalendarViewProps> = (props) => {
+  const {
+    appointments,
+    selectedDate,
+    onDateSelect,
+    onAppointmentClick,
+    loading = false,
+    className = ''
+  } = props
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   // Agrupar agendamentos por data
@@ -119,6 +120,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     )
   }
 
+  // Verificar se uma data tem agendamentos
+  const hasAppointments = (date: Date) => {
+    const counts = getAppointmentCounts(date)
+    return counts.pending + counts.confirmed + counts.completed + counts.cancelled > 0
+  }
+
   // Obter agendamentos do dia selecionado
   const selectedDateAppointments = selectedDate ? getAppointmentsForDate(selectedDate) : []
 
@@ -197,139 +204,33 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               day_hidden: "invisible",
             }}
             components={{
-              DayContent: ({ date }) => (
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <span className="text-sm">
-                    {format(date, 'd')}
-                  </span>
-                  {renderDayContent(date)}
-                </div>
-              )
+              DayContent: ({ date }) => {
+                const isOutsideMonth = date.getMonth() !== currentMonth.getMonth()
+                const isToday = isSameDay(date, new Date())
+                const isSelected = selectedDate && isSameDay(date, selectedDate)
+                const hasAppointmentsOnDay = hasAppointments(date)
+                
+                return (
+                  <div className={`
+                    relative w-full h-full flex items-center justify-center rounded-md
+                    ${isOutsideMonth ? 'text-muted-foreground opacity-50' : ''}
+                    ${isToday ? 'bg-accent text-accent-foreground' : ''}
+                    ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+                    ${hasAppointmentsOnDay && !isSelected ? 'bg-green-100 text-green-800 hover:bg-green-200' : ''}
+                    hover:bg-accent hover:text-accent-foreground cursor-pointer
+                  `}>
+                    <span className="text-sm">
+                      {format(date, 'd')}
+                    </span>
+                    {renderDayContent(date)}
+                  </div>
+                )
+              }
             }}
           />
         </CardContent>
       </Card>
 
-      {/* Agendamentos do Dia Selecionado */}
-      {selectedDate && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
-              {format(selectedDate, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
-              {isToday(selectedDate) && (
-                <Badge variant="secondary">Hoje</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : selectedDateAppointments.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum agendamento para este dia</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {selectedDateAppointments
-                  .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                  .map((appointment) => (
-                    <div
-                      key={appointment.id}
-                      className="p-3 sm:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                      onClick={() => onAppointmentClick?.(appointment)}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                          <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
-                            <AvatarImage 
-                              src={appointment.professional?.profile_photo} 
-                              alt={appointment.professional?.name}
-                            />
-                            <AvatarFallback>
-                              {appointment.professional?.name?.charAt(0) || 'P'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-semibold text-sm sm:text-base truncate">
-                              {appointment.professional?.name || 'Profissional'}
-                            </h4>
-                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                              {appointment.service?.name || 'Serviço'}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge 
-                          variant={
-                            appointment.status === 'confirmed' ? 'default' :
-                            appointment.status === 'pending' ? 'secondary' :
-                            appointment.status === 'completed' ? 'outline' :
-                            'destructive'
-                          }
-                          className="text-xs flex-shrink-0"
-                        >
-                          {appointment.status === 'pending' && 'Pendente'}
-                          {appointment.status === 'confirmed' && 'Confirmado'}
-                          {appointment.status === 'completed' && 'Concluído'}
-                          {appointment.status === 'cancelled' && 'Cancelado'}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>
-                            {appointment.start_time} - {appointment.end_time}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span>{appointment.client?.name || 'Cliente'}</span>
-                        </div>
-                        {appointment.salon?.address && (
-                          <div className="flex items-center gap-2 md:col-span-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span className="truncate">{appointment.salon.address}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Legenda */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Legenda</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-              <span>Pendente</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full" />
-              <span>Confirmado</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full" />
-              <span>Concluído</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full" />
-              <span>Cancelado</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

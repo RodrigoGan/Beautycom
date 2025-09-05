@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Instagram, Facebook, Twitter, Mail, Phone, MapPin, CheckCircle } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { Link } from "react-router-dom"
 
 export function Footer() {
   const [email, setEmail] = useState("")
@@ -92,9 +93,9 @@ export function Footer() {
             <ul className="space-y-2">
               <li><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Sobre Nós</Button></li>
               <li><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Como Funciona</Button></li>
-              <li><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Profissionais</Button></li>
-              <li><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">BeautyWall</Button></li>
-              <li><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Planos</Button></li>
+              <li><Link to="/membros"><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Profissionais</Button></Link></li>
+              <li><Link to="/beautywall"><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">BeautyWall</Button></Link></li>
+              <li><Link to="/planos"><Button variant="ghost" className="h-auto p-0 text-muted-foreground hover:text-primary text-sm">Planos</Button></Link></li>
             </ul>
           </div>
 
@@ -116,15 +117,15 @@ export function Footer() {
             <div className="space-y-3">
               <div className="flex items-center text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 mr-2" />
-                contato@beautycom.com
+                contato@beautycom.app.br
               </div>
               <div className="flex items-center text-sm text-muted-foreground">
                 <Phone className="h-4 w-4 mr-2" />
-                (11) 9999-9999
+                WhatsApp: (19) 99179-4331
               </div>
               <div className="flex items-center text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 mr-2" />
-                São Paulo, Brasil
+                Rio Claro, SP, Brasil
               </div>
             </div>
 

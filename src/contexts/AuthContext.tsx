@@ -11,9 +11,12 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
-  signUp: (email: string, password: string, name: string, userType?: 'usuario' | 'profissional') => Promise<{ data: any; error: any }>
+  signUp: (email: string, password: string, name: string, userType?: 'usuario' | 'profissional') => Promise<{ data: any; error: string }>
   signOut: () => Promise<void>
   updateUser: (updates: Partial<User>) => Promise<void>
+  syncUserType: () => Promise<void>
+  refreshUser: () => Promise<void>
+  userCache: Map<string, any>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -46,11 +49,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     
     try {
-      const { data, error } = await supabase
+      
+      // Adicionar timeout para evitar travamento
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout ao buscar usuário')), 10000) // 10 segundos
+      })
+      
+      const fetchPromise = supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single()
+      
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
       
       if (error) throw error
       
@@ -60,7 +71,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         timestamp: Date.now()
       })
       
-      console.log('✅ Dados do usuário carregados do banco e salvos no cache')
       return data
     } catch (error) {
       console.error('❌ Erro ao buscar usuário:', error)
@@ -72,70 +82,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        console.log('🔄 AuthContext - Verificando sessão...')
+        // Verificando sessão
         
-        // Timeout para verificação de sessão (reduzido para 5 segundos)
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout: Verificação de sessão demorou muito')), 5000)
-        })
-        
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any
+        // Buscar sessão sem timeout para evitar problemas
+        const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
-          console.log('🔄 AuthContext - Sessão encontrada, buscando dados do usuário...')
-          
-          // Timeout para busca de dados do usuário (reduzido para 5 segundos)
-          const userPromise = supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          
-          const userTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Timeout: Busca de dados do usuário demorou muito')), 5000)
-          })
+          // Sessão encontrada, buscando dados completos
           
           try {
-            const { data: userData, error } = await Promise.race([userPromise, userTimeoutPromise]) as any
-
-            if (error) {
-              console.error('Erro ao buscar dados do usuário:', error)
-              // Fallback para dados básicos
-              const basicUser = {
-                id: session.user.id,
-                email: session.user.email,
-                name: session.user.email?.split('@')[0] || 'Usuário',
-                nickname: session.user.email?.split('@')[0] || 'usuario',
-                user_type: 'usuario',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              } as any
-              setUser(basicUser)
-            } else {
-              setUser(userData)
-            }
-          } catch (userError) {
-            console.error('❌ Timeout ao buscar dados do usuário:', userError)
-            // Fallback para dados básicos
+            // Buscar dados completos do usuário do banco de dados
+            const userData = await fetchUserWithCache(session.user.id)
+            setUser(userData)
+            // Usuário carregado do banco
+          } catch (error) {
+            // Erro ao buscar dados do usuário, usando dados básicos
+            // Fallback para dados básicos da sessão
             const basicUser = {
               id: session.user.id,
               email: session.user.email,
               name: session.user.email?.split('@')[0] || 'Usuário',
               nickname: session.user.email?.split('@')[0] || 'usuario',
-              user_type: 'usuario',
+              user_type: session.user.user_metadata?.user_type || 'usuario',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             } as any
+            
             setUser(basicUser)
+            console.log('✅ AuthContext - Usuário definido da sessão (fallback):', {
+              name: basicUser.name,
+              userType: basicUser.user_type
+            })
           }
         } else {
           console.log('🔄 AuthContext - Nenhuma sessão encontrada')
           setUser(null)
         }
       } catch (error) {
-        console.error('❌ Timeout ao verificar sessão:', error)
-        // Se não conseguir verificar sessão, assumir que não está logado
+        console.error('❌ Erro ao verificar sessão:', error)
         setUser(null)
       } finally {
         setLoading(false)
@@ -147,31 +131,42 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // console.log('🔄 AuthContext - Evento de autenticação:', event)
+        // console.log('🔄 AuthContext - Sessão:', session ? 'Presente' : 'Ausente')
+        
         if (session?.user) {
-          // Buscar dados completos do usuário no banco
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          if (error) {
-            console.error('Erro ao buscar dados do usuário:', error)
-            // Fallback para dados básicos
+          // console.log('🔄 AuthContext - Usuário na sessão:', session.user.id)
+          
+          try {
+            // Buscar dados completos do usuário do banco de dados
+            const userData = await fetchUserWithCache(session.user.id)
+            setUser(userData)
+            console.log('✅ AuthContext - Usuário carregado do banco (onAuthStateChange):', {
+              name: userData.name,
+              userType: userData.user_type,
+              hasProfilePhoto: !!userData.profile_photo
+            })
+          } catch (error) {
+            console.log('⚠️ AuthContext - Erro ao buscar dados do usuário, usando dados básicos da sessão (onAuthStateChange):', error)
+            // Fallback para dados básicos da sessão
             const basicUser = {
               id: session.user.id,
               email: session.user.email,
               name: session.user.email?.split('@')[0] || 'Usuário',
               nickname: session.user.email?.split('@')[0] || 'usuario',
-              user_type: 'usuario',
+              user_type: session.user.user_metadata?.user_type || 'usuario',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             } as any
+            
             setUser(basicUser)
-          } else {
-            setUser(userData)
+            console.log('✅ AuthContext - Usuário definido da sessão (onAuthStateChange fallback):', {
+              name: basicUser.name,
+              userType: basicUser.user_type
+            })
           }
         } else {
+          console.log('🔄 AuthContext - Nenhuma sessão, limpando usuário')
           setUser(null)
         }
         setLoading(false)
@@ -181,11 +176,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Sincronizar user_type após o login (sempre sincronizar para manter atualizado)
+  useEffect(() => {
+    if (user?.id) {
+      // Sempre sincronizar para manter user_type atualizado
+      const timer = setTimeout(() => {
+        syncUserType()
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [user?.id])
+
   const signIn = async (email: string, password: string) => {
     try {
       console.log('🔄 Tentando fazer login com:', email)
       console.log('🔄 Iniciando chamada para Supabase Auth...')
       
+      // Login direto sem timeout para evitar problemas
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -203,26 +211,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.log('✅ Login bem-sucedido!')
         console.log('✅ User ID:', data.user?.id)
 
-        // Buscar dados completos do usuário no banco
+        // Buscar dados completos do usuário do banco de dados
         if (data.user) {
           try {
             const userData = await fetchUserWithCache(data.user.id)
             setUser(userData)
-            console.log('✅ Usuário completo carregado:', userData.name)
+            console.log('✅ Usuário carregado do banco no login:', {
+              name: userData.name,
+              userType: userData.user_type,
+              hasProfilePhoto: !!userData.profile_photo
+            })
           } catch (error) {
-            console.error('Erro ao buscar dados do usuário:', error)
-            // Fallback para dados básicos
+            console.log('⚠️ Erro ao buscar dados do usuário no login, usando dados básicos da sessão:', error)
+            // Fallback para dados básicos da sessão
             const basicUser = {
               id: data.user.id,
               email: data.user.email,
               name: data.user.email?.split('@')[0] || 'Usuário',
               nickname: data.user.email?.split('@')[0] || 'usuario',
-              user_type: 'usuario',
+              user_type: data.user.user_metadata?.user_type || 'usuario',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             } as any
+            
             setUser(basicUser)
-            console.log('✅ Usuário básico definido:', basicUser.name)
+            console.log('✅ Usuário definido da sessão no login (fallback):', {
+              name: basicUser.name,
+              userType: basicUser.user_type
+            })
           }
         }
 
@@ -296,19 +312,77 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signOut = async () => {
     try {
+      console.log('🔄 AuthContext - Iniciando logout...')
+      console.log('🔄 AuthContext - Usuário atual:', user?.id)
+      
       const { error } = await supabase.auth.signOut()
       if (error) throw error
+
+      // Limpar o estado do usuário imediatamente
+      setUser(null)
+      console.log('🔄 AuthContext - Estado do usuário limpo')
+
+      // Limpar o cache de usuários
+      userCache.clear()
+      console.log('🔄 AuthContext - Cache de usuários limpo')
 
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       })
+      
+      console.log('✅ AuthContext - Logout concluído com sucesso')
     } catch (error) {
+      console.error('❌ AuthContext - Erro no logout:', error)
       toast({
         title: "Erro no logout",
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive"
       })
+    }
+  }
+
+  // Função para sincronizar o user_type com o banco de dados
+  const syncUserType = async () => {
+    if (!user?.id) return
+    
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('user_type')
+        .eq('id', user.id)
+        .single()
+      
+      if (!error && userData && userData.user_type !== user.user_type) {
+        console.log('🔄 AuthContext - Sincronizando user_type:', {
+          old: user.user_type,
+          new: userData.user_type
+        })
+        setUser(prev => prev ? { ...prev, user_type: userData.user_type } : null)
+      }
+    } catch (err) {
+      // Silenciosamente ignora erros de sincronização
+      console.log('⚠️ AuthContext - Erro na sincronização do user_type (não crítico):', err)
+    }
+  }
+
+  // Função para atualizar dados do usuário do banco
+  const refreshUser = async () => {
+    if (!user?.id) return
+    
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      
+      if (!error && userData) {
+        console.log('🔄 AuthContext - Dados do usuário atualizados do banco')
+        setUser(userData)
+      }
+    } catch (err) {
+      console.log('⚠️ AuthContext - Erro ao atualizar dados do usuário (não crítico):', err)
     }
   }
 
@@ -341,7 +415,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, updateUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      signUp, 
+      signIn, 
+      signOut, 
+      updateUser, 
+      syncUserType,
+      refreshUser,
+      userCache 
+    }}>
       {children}
     </AuthContext.Provider>
   )

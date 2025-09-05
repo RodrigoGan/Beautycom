@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, User } from '@/lib/supabase'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export interface UserFilters {
   search?: string
@@ -56,6 +57,7 @@ export interface UseUsersReturn {
 }
 
 export function useUsers(filters: UserFilters = {}) {
+  const { user } = useAuthContext()
   const [users, setUsers] = useState<User[]>([])
   const [salons, setSalons] = useState<SalonStudio[]>([])
   const [loading, setLoading] = useState(false)
@@ -65,9 +67,7 @@ export function useUsers(filters: UserFilters = {}) {
   const [currentOffset, setCurrentOffset] = useState(0)
 
   const fetchUsers = useCallback(async (filters: UserFilters = {}, resetPage = false) => {
-    console.log('🚀 useUsers - Iniciando busca de usuários e salões...')
-    console.log('🔍 Filtros recebidos:', filters)
-    console.log('🔄 Reset page:', resetPage)
+    // Iniciando busca de usuários e salões
     
     setLoading(true)
     setError(null)
@@ -87,25 +87,19 @@ export function useUsers(filters: UserFilters = {}) {
     const retryWithBackoff = async (fn: () => Promise<any>, maxRetries: number = 2) => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`🔄 Tentativa ${attempt}/${maxRetries}...`)
           return await executeQueryWithTimeout(fn, 5000)
         } catch (error) {
-          console.error(`❌ Tentativa ${attempt} falhou:`, error)
           if (attempt === maxRetries) {
             throw error
           }
           const delay = Math.pow(2, attempt) * 1000 // 2s, 4s
-          console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
     }
     
     try {
-      console.log('📡 Fazendo requisição para Supabase...')
-      
-      // Teste de conectividade básica com retry reduzido
-      console.log('🔍 Testando conectividade básica...')
+      // Fazendo requisição para Supabase
       try {
         const { data: testData, error: testError } = await retryWithBackoff(async () => {
           return await supabase
@@ -115,13 +109,9 @@ export function useUsers(filters: UserFilters = {}) {
         })
         
         if (testError) {
-          console.error('❌ Erro na query de teste:', testError)
-          console.error('❌ Código do erro:', testError.code)
-          console.error('❌ Mensagem do erro:', testError.message)
-          
           // Se for erro de rate limit, usar fallback
           if (testError.code === 'PGRST301' || testError.message.includes('rate limit')) {
-            console.log('⚠️ Rate limit detectado - usando fallback')
+            // Rate limit detectado
             setError('Rate limit do Supabase - usando dados de fallback')
             setUsers([])
             setSalons([])
@@ -142,16 +132,13 @@ export function useUsers(filters: UserFilters = {}) {
           return
         }
         
-        console.log('✅ Query de teste OK -', testData?.length || 0, 'usuários encontrados')
-        if (testData && testData.length > 0) {
-          console.log('✅ Primeiro usuário de teste:', testData[0])
-        }
+        // Query de teste OK
       } catch (error) {
         console.error('❌ Erro na query de teste após retry:', error)
         
         // Se for timeout, provavelmente é rate limit
         if (error instanceof Error && error.message.includes('Timeout')) {
-          console.log('⚠️ Timeout detectado - provavelmente rate limit do Supabase')
+          // Timeout detectado
           setError('Supabase com limite excedido - usando dados de fallback')
           setUsers([])
           setSalons([])
@@ -172,30 +159,26 @@ export function useUsers(filters: UserFilters = {}) {
         return
       }
       
-      console.log('🔍 Construindo queries...')
+      // Construindo queries
       
       // Buscar usuários
       let usersQuery = supabase
         .from('users')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(0, 11)
+        .range(0, 20) // Aumentar range para garantir que o Rodrigo apareça
 
-      console.log('🔍 Query de usuários base construída')
+      // Query de usuários base construída
 
       // Aplicar filtro por tipo de usuário
       if (filters.userType && filters.userType !== 'all') {
-        console.log('🔍 Aplicando filtro userType:', filters.userType)
         if (filters.userType === 'profissional') {
           usersQuery = usersQuery.eq('user_type', 'profissional')
-          console.log('🔍 Filtro aplicado: user_type = "profissional"')
         } else if (filters.userType === 'usuario') {
           usersQuery = usersQuery.eq('user_type', 'usuario')
-          console.log('🔍 Filtro aplicado: user_type = "usuario"')
         }
       } else {
         // Se não há filtro específico, buscar apenas profissionais por padrão
-        console.log('🔍 Sem filtro de tipo específico - buscando profissionais por padrão')
         usersQuery = usersQuery.eq('user_type', 'profissional')
       }
 
@@ -203,31 +186,31 @@ export function useUsers(filters: UserFilters = {}) {
       if (filters.search && filters.search.trim()) {
         const searchTerm = filters.search.trim()
         usersQuery = usersQuery.or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
-        console.log('🔍 Filtro de busca aplicado para usuários:', searchTerm)
+        // Filtro de busca aplicado
       }
 
       // Aplicar filtro de categoria para usuários
       if (filters.category) {
         usersQuery = usersQuery.contains('categories', [filters.category])
-        console.log('🔍 Filtro de categoria aplicado para usuários:', filters.category)
+        // Filtro de categoria aplicado
       }
 
       // Aplicar filtro de localização para usuários
       if (filters.location && filters.location.trim()) {
         const locationTerm = filters.location.trim()
         usersQuery = usersQuery.or(`cidade.ilike.%${locationTerm}%,uf.ilike.%${locationTerm}%,bairro.ilike.%${locationTerm}%`)
-        console.log('🔍 Filtro de localização aplicado para usuários:', locationTerm)
+        // Filtro de localização aplicado
       }
 
       // Buscar salões se o filtro for para profissionais
       let salonsQuery = null
       if (filters.userType === 'profissional' || !filters.userType) {
-        console.log('🔍 Construindo query de salões...')
+        // Construindo query de salões
         salonsQuery = supabase
           .from('salons_studios')
           .select(`
             *,
-            owner:users(id, name, email, profile_photo, user_type)
+            owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
           `, { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(0, 11)
@@ -236,19 +219,18 @@ export function useUsers(filters: UserFilters = {}) {
         if (filters.search && filters.search.trim()) {
           const searchTerm = filters.search.trim()
           salonsQuery = salonsQuery.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-          console.log('🔍 Filtro de busca aplicado para salões:', searchTerm)
+          // Filtro de busca aplicado
         }
 
         // Aplicar filtro de localização para salões
         if (filters.location && filters.location.trim()) {
           const locationTerm = filters.location.trim()
           salonsQuery = salonsQuery.or(`cidade.ilike.%${locationTerm}%,uf.ilike.%${locationTerm}%,bairro.ilike.%${locationTerm}%`)
-          console.log('🔍 Filtro de localização aplicado para salões:', locationTerm)
+          // Filtro de localização aplicado
         }
       }
 
-      console.log('🔍 Queries finais construídas com todos os filtros aplicados')
-      console.log('📡 Executando queries...')
+      // Queries finais construídas
       
       const startTime = Date.now()
       
@@ -261,37 +243,27 @@ export function useUsers(filters: UserFilters = {}) {
       const endTime = Date.now()
       const duration = endTime - startTime
       
-      console.log('📡 Queries executadas!')
-      console.log('⏱️ Duração das queries:', duration, 'ms')
-      console.log('📊 Resultado das queries:', { 
-        users: usersResult.data?.length || 0, 
-        salons: salonsResult.data?.length || 0,
-        usersError: usersResult.error?.message || 'Nenhum',
-        salonsError: salonsResult.error?.message || 'Nenhum',
-        totalCount: (usersResult.count || 0) + (salonsResult.count || 0)
-      })
+      // Queries executadas
       
-      // Debug: verificar se o Rodrigo está nos resultados
-      if (usersResult.data) {
-        const rodrigoUsuario = usersResult.data.find((u: any) => u.name?.toLowerCase().includes('rodrigo'))
-        console.log('🔍 Debug Rodrigo na query de usuários:', {
-          encontrado: !!rodrigoUsuario,
-          dados: rodrigoUsuario ? { id: rodrigoUsuario.id, name: rodrigoUsuario.name, user_type: rodrigoUsuario.user_type } : null
-        })
-      }
+
       
-      if (salonsResult.data) {
-        const rodrigoSalon = salonsResult.data.find((s: any) => s.name?.toLowerCase().includes('rodrigo') || s.owner?.name?.toLowerCase().includes('rodrigo'))
-        console.log('🔍 Debug Rodrigo na query de salões:', {
-          encontrado: !!rodrigoSalon,
-          dados: rodrigoSalon ? { id: rodrigoSalon.id, name: rodrigoSalon.name, owner: rodrigoSalon.owner?.name } : null
-        })
-      }
+
 
       if (usersResult.error) {
         console.error('❌ Erro ao buscar usuários:', usersResult.error)
         console.error('❌ Código do erro:', usersResult.error.code)
         console.error('❌ Mensagem do erro:', usersResult.error.message)
+        
+        // Se for erro de rate limit, usar fallback
+        if (usersResult.error.code === 'PGRST301' || usersResult.error.message.includes('rate limit') || usersResult.error.message.includes('Exceeding usage limits')) {
+          // Rate limit detectado
+          setError('Rate limit do Supabase - usando dados de fallback')
+          setUsers([])
+          setTotalCount(0)
+          setHasMore(false)
+          setLoading(false)
+          return
+        }
         
         setError(usersResult.error.message)
         setUsers([])
@@ -313,9 +285,7 @@ export function useUsers(filters: UserFilters = {}) {
       }
 
       if (usersResult.data) {
-        console.log('✅ Dados de usuários recebidos com sucesso!')
-        console.log('📊 Total de usuários:', usersResult.data.length)
-        console.log('🔢 Count total:', usersResult.count || 0)
+        // Dados de usuários recebidos com sucesso
         
         if (usersResult.data.length > 0) {
           console.log('✅ Primeiro usuário:', usersResult.data[0])
@@ -452,7 +422,7 @@ export function useUsers(filters: UserFilters = {}) {
           .from('salons_studios')
           .select(`
             *,
-            owner:users(id, name, email, profile_photo, user_type)
+            owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
           `)
           .order('created_at', { ascending: false })
           .range(currentOffset, currentOffset + 11)

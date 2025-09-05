@@ -79,9 +79,9 @@ const ImageUploadEditor = ({
        })
      }
 
-     // Validar tamanho dos vídeos
+     // Validar tamanho dos vídeos (mais permissivo - a compressão vai cuidar)
      const validateVideoSize = (file: File): boolean => {
-       const maxSizeMB = window.innerWidth <= 768 ? 10 : 25 // 10MB mobile, 25MB desktop
+       const maxSizeMB = window.innerWidth <= 768 ? 50 : 100 // 50MB mobile, 100MB desktop
        const maxSize = maxSizeMB * 1024 * 1024
        return file.size <= maxSize
      }
@@ -99,7 +99,7 @@ const ImageUploadEditor = ({
            
            const isValidSize = validateVideoSize(file)
            if (!isValidSize) {
-             const maxSizeMB = window.innerWidth <= 768 ? 10 : 25
+             const maxSizeMB = window.innerWidth <= 768 ? 50 : 100
              alert(`Vídeo muito grande. Máximo: ${maxSizeMB}MB`)
              return
            }

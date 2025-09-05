@@ -171,13 +171,22 @@ export const usePostUpload = () => {
     
     try {
       console.log('🚀 Iniciando criação de post...')
+      console.log('📊 Dados do post:', {
+        title: postData.title,
+        description: postData.description?.substring(0, 50) + '...',
+        category: postData.category,
+        postType: postData.postType,
+        imagesCount: postData.images?.length || 0,
+        videosCount: postData.videos?.length || 0
+      })
       
       // Verificar se o usuário está logado
       if (!user || !user.id) {
+        console.error('❌ Usuário não está logado:', user)
         throw new Error('Usuário não está logado')
       }
       
-      console.log('Usuário para criar post:', user)
+      console.log('✅ Usuário logado:', { id: user.id, email: user.email })
       
       // Timeout para operações do Supabase (30 segundos no mobile)
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -205,9 +214,20 @@ export const usePostUpload = () => {
         timeout
       )
       
-      if (categoryError || !category) {
+      if (categoryError) {
         console.error('❌ Erro ao buscar categoria:', categoryError)
-        throw new Error('Categoria não encontrada')
+        console.error('❌ Detalhes do erro:', {
+          code: categoryError.code,
+          message: categoryError.message,
+          details: categoryError.details,
+          hint: categoryError.hint
+        })
+        throw new Error(`Erro ao buscar categoria: ${categoryError.message}`)
+      }
+      
+      if (!category) {
+        console.error('❌ Categoria não encontrada no banco')
+        throw new Error('Categoria não encontrada no banco de dados')
       }
       
       console.log('✅ Categoria encontrada:', category)
@@ -253,7 +273,18 @@ export const usePostUpload = () => {
       
       if (postError) {
         console.error('❌ Erro ao criar post:', postError)
+        console.error('❌ Detalhes do erro de criação:', {
+          code: postError.code,
+          message: postError.message,
+          details: postError.details,
+          hint: postError.hint
+        })
         throw new Error(`Erro ao criar post: ${postError.message}`)
+      }
+      
+      if (!post) {
+        console.error('❌ Post não foi criado - dados retornados:', post)
+        throw new Error('Post não foi criado no banco de dados')
       }
       
       console.log('✅ Post criado com ID:', post.id)

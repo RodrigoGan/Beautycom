@@ -95,34 +95,32 @@ const BeautyWall = () => {
     setIsPageScrollDisabled(false)
   }, [])
 
-  console.log('🔍 BeautyWall - Estado do usePosts:', {
-    postsCount: postsReais.length,
-    loading: postsLoading,
-    error: postsError,
-    isInitialized,
-    hasMore,
-    user: !!user
-  })
+  // Debug removido para evitar poluição do console
 
   // Forçar busca inicial se não foi inicializado - CORRIGIDO
   useEffect(() => {
-    console.log('🔄 BeautyWall useEffect - Verificando inicialização...')
-    console.log('🔄 Estado atual:', { isInitialized, postsLoading, postsCount: postsReais.length })
     if (!isInitialized && !postsLoading) {
-      console.log('🚀 BeautyWall - Forçando busca inicial...')
       fetchPosts(true)
     }
-  }, [isInitialized, postsLoading]) // Removido fetchPosts das dependências
+  }, [isInitialized, postsLoading, fetchPosts])
+
+  // Trava para evitar loops infinitos
+  const [loopProtection, setLoopProtection] = useState(0)
+  useEffect(() => {
+    if (loopProtection > 10) {
+      console.error('🚨 LOOP INFINITO DETECTADO - Parando execução')
+      return
+    }
+    setLoopProtection(prev => prev + 1)
+  }, [postsReais.length, postsLoading, isInitialized])
 
   // Timeout de segurança para evitar travamento infinito
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (postsLoading && postsReais.length === 0) {
-        console.warn('⚠️ BeautyWall - Timeout de segurança ativado (10s)')
-        console.warn('⚠️ Forçando parada do loading para evitar travamento')
         setLoadingTimeout(true)
       }
-    }, 10000) // 10 segundos (mais agressivo)
+    }, 10000)
 
     return () => clearTimeout(timeoutId)
   }, [postsLoading, postsReais.length])
@@ -131,11 +129,9 @@ const BeautyWall = () => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (!isInitialized && postsReais.length === 0) {
-        console.warn('⚠️ BeautyWall - Timeout de inicialização ativado (8s)')
-        console.warn('⚠️ Forçando parada do loading para evitar travamento')
         setLoadingTimeout(true)
       }
-    }, 8000) // 8 segundos
+    }, 8000)
 
     return () => clearTimeout(timeoutId)
   }, [isInitialized, postsReais.length])
@@ -270,10 +266,16 @@ const BeautyWall = () => {
 
   const handlePostDataChange = (data: any) => {
     setPostData(data)
-    // Limpar erros quando o usuário digita
-    if (errors.title && data.title) setErrors(prev => ({ ...prev, title: '' }))
-    if (errors.description && data.description) setErrors(prev => ({ ...prev, description: '' }))
-    if (errors.category && data.category) setErrors(prev => ({ ...prev, category: '' }))
+    // Limpar erros quando o usuário digita ou quando o campo fica válido
+    if (errors.title && data.title && data.title.trim().length >= 3) {
+      setErrors(prev => ({ ...prev, title: '' }))
+    }
+    if (errors.description && data.description && data.description.trim().length >= 10) {
+      setErrors(prev => ({ ...prev, description: '' }))
+    }
+    if (errors.category && data.category) {
+      setErrors(prev => ({ ...prev, category: '' }))
+    }
   }
 
   const handleErrorsChange = (newErrors: {[key: string]: string}) => {
@@ -288,7 +290,6 @@ const BeautyWall = () => {
 
   // Função para limpar busca
   const handleClearSearch = () => {
-    console.log('🔄 Limpando filtros...')
     setSearchTerm('')
     setSelectedCategory('')
     setSelectedPostType('')
@@ -350,15 +351,7 @@ const BeautyWall = () => {
     let isCarousel = false
     let carouselImages: string[] = []
     
-    console.log('Convertendo post:', post.id, 'post_type:', post.post_type, 'filtro_atual:', filters.postType, 'media_urls:', JSON.stringify(post.media_urls, null, 2))
-    console.log('🔍 DEBUG AUTHOR:', {
-      author: post.author,
-      tipo: typeof post.author,
-      nickname: post.author?.nickname,
-      user_id: post.user_id,
-      post_id: post.id
-    })
-    console.log('🔍 DEBUG AUTHOR EXPANDIDO:', JSON.stringify(post.author, null, 2))
+    // Debug removido para limpar console
     
     // Abordagem baseada no post_type
     switch (post.post_type) {
@@ -370,7 +363,6 @@ const BeautyWall = () => {
           isVideo = firstMedia.type === 'video' || (imagemUrl && (imagemUrl.includes('.mp4') || imagemUrl.includes('.mov') || imagemUrl.includes('.avi')))
           
           // NÃO detectar carrossel automaticamente - usar apenas post_type do banco
-          console.log('DEBUG: Post normal -', post.media_urls.media.length, 'mídias')
         } else if (post.media_urls && post.media_urls.url) {
           // Formato antigo
           imagemUrl = post.media_urls.url
@@ -380,7 +372,6 @@ const BeautyWall = () => {
           beforeUrl = post.media_urls.before
           afterUrl = post.media_urls.after
           imagemUrl = afterUrl
-          console.log('DEBUG: Post normal com estrutura before-after - usando foto depois')
         }
         break
         
@@ -397,7 +388,6 @@ const BeautyWall = () => {
             return url
           })
           imagemUrl = carouselImages[0] // Primeira imagem como principal
-          console.log('DEBUG: Post carrossel detectado -', carouselImages.length, 'imagens')
         }
         break
         
@@ -409,18 +399,15 @@ const BeautyWall = () => {
           beforeUrl = post.media_urls.media[0].url
           afterUrl = post.media_urls.media[1].url
           imagemUrl = afterUrl
-          console.log('DEBUG: Post before-after (media array) detectado')
         } else if (post.media_urls && post.media_urls.beforeAfter) {
           beforeUrl = post.media_urls.beforeAfter.before
           afterUrl = post.media_urls.beforeAfter.after
           imagemUrl = afterUrl // Usar a foto "depois" como principal
-          console.log('DEBUG: Post before-after detectado')
         } else if (post.media_urls && post.media_urls.before && post.media_urls.after) {
           // Formato antigo
           beforeUrl = post.media_urls.before
           afterUrl = post.media_urls.after
           imagemUrl = afterUrl
-          console.log('DEBUG: Post before-after (formato antigo) detectado')
         }
         break
         
@@ -431,17 +418,14 @@ const BeautyWall = () => {
           const videoMedia = post.media_urls.media.find((media: any) => media.type === 'video')
           if (videoMedia) {
             imagemUrl = videoMedia.url
-            console.log('DEBUG: Post vídeo detectado')
           }
         } else if (post.media_urls && post.media_urls.url) {
           imagemUrl = post.media_urls.url
-          console.log('DEBUG: Post vídeo (formato antigo) detectado')
         }
         break
         
       default:
         // Fallback para posts antigos
-        console.log('DEBUG: Post com tipo desconhecido:', post.post_type, '- usando fallback')
         if (post.media_urls && post.media_urls.media && post.media_urls.media.length > 0) {
           const firstMedia = post.media_urls.media[0]
           imagemUrl = firstMedia.url
@@ -472,12 +456,7 @@ const BeautyWall = () => {
     // Verificar se a URL não é de exemplo ou se falhou
     if (imagemUrl && (imagemUrl.includes('example.com') || imagemUrl.includes('placeholder'))) {
       imagemUrl = "/placeholder-post.jpg"
-      console.log('URL inválida detectada, usando placeholder')
     }
-    
-    console.log('DEBUG: Final imagemUrl:', imagemUrl, 'Post ID:', post.id)
-    console.log('DEBUG: isBeforeAfter:', isBeforeAfter, 'beforeUrl:', beforeUrl, 'afterUrl:', afterUrl)
-    console.log('DEBUG: isCarousel:', isCarousel, 'carouselImages:', carouselImages)
     
     const result = {
       id: post.id,
@@ -513,31 +492,12 @@ const BeautyWall = () => {
   }
 
   // Usar apenas posts reais do banco
-  console.log('🔍 Posts do hook usePosts:', postsReais.length)
   
   // Verificar se há problema de conectividade
   if (postsReais.length === 0 && postsError) {
-    console.log('⚠️ Problema de conectividade detectado na BeautyWall:', postsError)
     if (postsError.includes('timeout') || postsError.includes('limite') || postsError.includes('usage')) {
-      console.log('💡 Isso pode ser devido ao "Exceeding usage limits" no Supabase')
+      // Problema de conectividade detectado
     }
-  }
-  
-  // Log adicional para debug
-  console.log('🔍 BeautyWall - Estado atual:', {
-    postsCount: postsReais.length,
-    loading: postsLoading,
-    error: postsError,
-    isInitialized,
-    loadingTimeout,
-    hasMore,
-    user: !!user,
-    filters: filters
-  })
-  
-  // Log específico para problemas de conectividade
-  if (postsError) {
-    console.log('❌ Erro no banco de dados:', postsError)
   }
   
   // Fallback para posts se não há dados do banco
@@ -549,24 +509,18 @@ const BeautyWall = () => {
     // Verificar se é erro de conectividade ou filtro sem resultados
     if (postsError) {
       // Erro de conectividade - mostrar fallback
-      console.log('⚠️ Erro de conectividade - usando fallback temporário')
-      console.log('💡 Isso pode ser devido ao "Exceeding usage limits" no Supabase')
       showFallback = true
     } else if (filters.category || filters.postType || filters.search) {
       // Filtro sem resultados - mostrar mensagem específica
-      console.log('🔍 Filtro aplicado sem resultados - mostrando mensagem específica')
-      console.log('📋 Filtros ativos:', { category: filters.category, postType: filters.postType, search: filters.search })
       showNoResultsMessage = true
     } else {
       // Sem filtros e sem dados - pode ser erro de conectividade
-      console.log('⚠️ Nenhum dado do banco sem filtros - usando fallback temporário')
       showFallback = true
     }
   }
   
   // Aplicar fallback se necessário
   if (showFallback) {
-    console.log('✅ Fallback ativo - 3 posts de exemplo sendo exibidos')
     
     const fallbackPosts = [
       {
@@ -656,24 +610,9 @@ const BeautyWall = () => {
   const postsUnicos = postsExibidos.filter((post, index, self) => 
     index === self.findIndex(p => p.id === post.id)
   )
-  
-  console.log('🔍 Posts originais:', postsExibidos.length, 'Posts únicos:', postsUnicos.length)
-  if (postsExibidos.length !== postsUnicos.length) {
-    console.log('⚠️ Posts duplicados removidos:', postsExibidos.length - postsUnicos.length)
-  }
 
   // Aplicar limitação para usuários não logados (apenas 3 posts)
   const postsParaExibir = user ? postsUnicos : postsUnicos.slice(0, 3)
-  
-  // Log para debug da renderização
-  console.log('🎨 Renderização:', {
-    postsParaExibir: postsParaExibir.length,
-    loadingTimeout,
-    postsError: !!postsError,
-    postsLoading,
-    isInitialized,
-    user: !!user
-  })
 
   // Função para lidar com clique no post/autor
   const handlePostClick = (post: any, type: 'post' | 'author') => {
@@ -1712,6 +1651,11 @@ const BeautyWall = () => {
         onPostDataChange={handlePostDataChange}
         onErrorsChange={handleErrorsChange}
         errors={errors}
+        onPostCreated={() => {
+          // Recarregar posts após criação bem-sucedida
+          console.log('🔄 Recarregando posts após criação...')
+          fetchPosts()
+        }}
       />
 
       {/* Modal para vídeo */}

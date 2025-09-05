@@ -186,7 +186,7 @@ export const useSalonPermissions = (salonId?: string) => {
       setLoading(true)
       setError(null)
 
-      console.log('🔍 Buscando permissões do usuário:', { salonId, userId: user.id })
+      // console.log('🔍 Buscando permissões do usuário:', { salonId, userId: user.id })
 
       // Verificar se é dono do salão
       const { data: salonData, error: salonError } = await supabase
@@ -201,7 +201,7 @@ export const useSalonPermissions = (salonId?: string) => {
       }
 
       if (salonData?.owner_id === user.id) {
-        console.log('✅ Usuário é dono do salão')
+        // console.log('✅ Usuário é dono do salão')
         setUserRole('owner')
         setUserPermissions(DEFAULT_PERMISSIONS.admin)
         setLoading(false)
@@ -223,7 +223,7 @@ export const useSalonPermissions = (salonId?: string) => {
       if (employeeError) {
         if (employeeError.code === 'PGRST116') {
           // Não encontrou funcionário
-          console.log('ℹ️ Usuário não é funcionário do salão')
+          // console.log('ℹ️ Usuário não é funcionário do salão')
           setUserRole('none')
           setUserPermissions(null)
         } else {
@@ -231,7 +231,7 @@ export const useSalonPermissions = (salonId?: string) => {
           throw employeeError
         }
       } else if (employeeData) {
-        console.log('✅ Funcionário encontrado:', employeeData)
+        // console.log('✅ Funcionário encontrado:', employeeData)
         setUserRole(employeeData.role)
         setUserPermissions(employeeData.permissions)
       }
@@ -247,7 +247,7 @@ export const useSalonPermissions = (salonId?: string) => {
   // Atualizar permissões quando salonId ou user mudar
   useEffect(() => {
     fetchUserPermissions()
-  }, [fetchUserPermissions])
+  }, [salonId, user?.id]) // Removida dependência fetchUserPermissions para evitar loop
 
   return {
     // Estados

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useSalons } from '@/hooks/useSalons'
+import { useAppointmentNotifications } from './useAppointmentNotifications'
 
 // Interfaces TypeScript
 export interface Appointment {
@@ -72,6 +74,15 @@ export interface UpdateAppointmentData {
 export const useAppointments = () => {
   const { user } = useAuthContext()
   const { toast } = useToast()
+  const { userSalon } = useSalons(user?.id)
+  const { 
+    notifyAppointmentConfirmed, 
+    notifyAppointmentCreated, 
+    notifyAppointmentCancelled,
+    notifyAppointmentNoShow,
+    notifyAppointmentCompleted,
+    notifyAppointmentPending
+  } = useAppointmentNotifications(userSalon?.id)
   
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(false)
@@ -95,10 +106,10 @@ export const useAppointments = () => {
         .from('appointments')
         .select(`
           *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
         `)
         .or(`client_id.eq.${targetUserId},professional_id.eq.${targetUserId}`)
         .order('date', { ascending: true })
@@ -106,8 +117,51 @@ export const useAppointments = () => {
 
       if (error) throw error
 
-      setAppointments(data || [])
-      return data
+      // ✅ SIMPLIFICADO: Filtrar apenas agendamentos de profissionais com agenda ativa
+      
+      const filteredData = []
+      for (const appointment of data || []) {
+        try {
+          // Verificar se o profissional tem agenda habilitada OU se é o dono do salão
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('agenda_enabled')
+            .eq('id', appointment.professional_id)
+            .single()
+          
+          if (userError) {
+            console.warn('⚠️ Erro ao verificar agenda_enabled para profissional:', appointment.professional_id, userError)
+            // Em caso de erro, incluir o agendamento para não perder dados
+            filteredData.push(appointment)
+            continue
+          }
+          
+          // Verificar se é dono do salão
+          const { data: salonData } = await supabase
+            .from('salons_studios')
+            .select('owner_id')
+            .eq('id', appointment.salon_id)
+            .single()
+          
+          const isSalonOwner = salonData?.owner_id === appointment.professional_id
+          
+          // LÓGICA CORRETA: 
+          // - Se é dono do salão E tem agenda habilitada → pode ver seus agendamentos
+          // - Se é dono do salão MAS NÃO tem agenda habilitada → NÃO pode ver seus agendamentos
+          // - Se é profissional com agenda habilitada → pode ver seus agendamentos
+          if (userData?.agenda_enabled) {
+            filteredData.push(appointment)
+          }
+        } catch (err) {
+          console.warn('⚠️ Erro ao verificar agenda_enabled:', err)
+          // Em caso de erro, incluir o agendamento para não perder dados
+          filteredData.push(appointment)
+        }
+      }
+
+
+      setAppointments(filteredData)
+      return filteredData
 
     } catch (err) {
       console.error('❌ Erro ao buscar agendamentos:', err)
@@ -125,7 +179,7 @@ export const useAppointments = () => {
   }, [user?.id, toast])
 
   // Buscar agendamentos de um salão específico
-  const fetchSalonAppointments = useCallback(async (salonId: string, date?: string) => {
+  const fetchSalonAppointments = useCallback(async (salonId: string, date?: string, professionalId?: string) => {
     // Sistema de segurança contra loops
     if (!salonId || salonId.trim() === '') {
       console.log('⚠️ SalonId vazio, ignorando busca')
@@ -137,7 +191,7 @@ export const useAppointments = () => {
       return null
     }
     
-    if (lastFetchSalonId === salonId && !date) {
+    if (lastFetchSalonId === salonId && !date && !professionalId) {
       console.log('⚠️ Dados já carregados para este salão, ignorando')
       return null
     }
@@ -147,18 +201,21 @@ export const useAppointments = () => {
       setLoading(true)
       setError(null)
       
-      console.log('🔍 Buscando agendamentos para salão:', salonId)
-
       let query = supabase
         .from('appointments')
         .select(`
           *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
         `)
-        .eq('salon_id', salonId)
+        .or(`salon_id.eq.${salonId},salon_id.is.null`) // ✅ Incluir profissionais independentes
+
+      // Se for um profissional vinculado, filtrar apenas seus agendamentos
+      if (professionalId) {
+        query = query.eq('professional_id', professionalId)
+      }
 
       if (date) {
         query = query.eq('date', date)
@@ -168,18 +225,87 @@ export const useAppointments = () => {
         .order('date', { ascending: true })
         .order('start_time', { ascending: true })
 
-      console.log('📊 Resultado da busca:', { data: data?.length || 0, error })
-
       if (error) throw error
+
+      // ✅ SIMPLIFICADO: Filtrar apenas agendamentos de profissionais com agenda ativa
+      
+      const filteredData = []
+      for (const appointment of data || []) {
+        try {
+          // Verificar se o profissional tem agenda habilitada OU se é o dono do salão
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('agenda_enabled')
+            .eq('id', appointment.professional_id)
+            .single()
+          
+          if (userError) {
+            console.warn('⚠️ Erro ao verificar agenda_enabled para profissional:', appointment.professional_id, userError)
+            // Em caso de erro, incluir o agendamento para não perder dados
+            filteredData.push(appointment)
+            continue
+          }
+          
+          // Verificar se é dono do salão
+          const { data: salonData } = await supabase
+            .from('salons_studios')
+            .select('owner_id')
+            .eq('id', appointment.salon_id)
+            .single()
+          
+          const isSalonOwner = salonData?.owner_id === appointment.professional_id
+          
+          // LÓGICA CORRETA: 
+          // - Se é dono do salão E tem agenda habilitada → pode ver seus agendamentos
+          // - Se é dono do salão MAS NÃO tem agenda habilitada → NÃO pode ver seus agendamentos
+          // - Se é profissional com agenda habilitada → pode ver seus agendamentos
+          if (userData?.agenda_enabled) {
+            filteredData.push(appointment)
+          }
+        } catch (err) {
+          console.warn('⚠️ Erro ao verificar agenda_enabled:', err)
+          // Em caso de erro, incluir o agendamento para não perder dados
+          filteredData.push(appointment)
+        }
+      }
+
 
       // Atualizar estado de segurança
       setLastFetchSalonId(salonId)
       
-      return data
+      // Atualizar o estado de appointments com dados filtrados
+      setAppointments(filteredData)
+      
+      return filteredData
 
     } catch (err) {
-      console.error('❌ Erro ao buscar agendamentos do salão:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
+      console.error('❌ fetchSalonAppointments: Erro ao buscar agendamentos do salão:', err)
+      console.error('❌ fetchSalonAppointments: Tipo do erro:', err instanceof Error ? err.constructor.name : typeof err)
+      
+      // Log detalhado para erros do Supabase
+      if (err && typeof err === 'object' && 'code' in err) {
+        console.error('❌ fetchSalonAppointments: Código do erro Supabase:', (err as any).code)
+        console.error('❌ fetchSalonAppointments: Mensagem do erro Supabase:', (err as any).message)
+        console.error('❌ fetchSalonAppointments: Detalhes do erro Supabase:', (err as any).details)
+        console.error('❌ fetchSalonAppointments: Dica do erro Supabase:', (err as any).hint)
+      }
+      
+      let errorMessage = 'Erro desconhecido'
+      
+      if (err instanceof Error) {
+        errorMessage = err.message
+        
+        // Tratamento específico para erros de limite
+        if (err.message.includes('limit') || err.message.includes('rate') || err.message.includes('quota')) {
+          errorMessage = 'Limite de uso do Supabase excedido. Tente novamente em alguns minutos.'
+        }
+        
+        // Tratamento específico para erros de permissão
+        if (err.message.includes('permission') || err.message.includes('policy')) {
+          errorMessage = 'Erro de permissão. Verifique se você tem acesso para visualizar agendamentos.'
+        }
+      }
+      
       setError(errorMessage)
       
       // TEMPORARIAMENTE DESABILITADO - Debug de loop
@@ -194,61 +320,152 @@ export const useAppointments = () => {
       setLoading(false)
       setIsFetchingSalon(false)
     }
-  }, [toast, isFetchingSalon, lastFetchSalonId])
+  }, [isFetchingSalon, lastFetchSalonId]) // Removida dependência toast para evitar loops
 
   // Criar novo agendamento
   const createAppointment = useCallback(async (appointmentData: CreateAppointmentData) => {
-    try {
-      setLoading(true)
-      setError(null)
+    
+    // Sistema de retry para lidar com limites excedidos
+    let attempts = 0
+    const maxAttempts = 3
+    
+    while (attempts < maxAttempts) {
+      try {
+        attempts++
+        
+        setLoading(true)
+        setError(null)
 
-      // Gerar código de confirmação único
-      const confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        // Gerar código de confirmação único
+        const confirmationCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        
+        const { data, error } = await supabase
+          .from('appointments')
+          .insert({
+            ...appointmentData,
+            status: 'pending',
+            payment_status: 'pending',
+            confirmation_code: confirmationCode
+          })
+          .select(`
+            *,
+            salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+            client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+            professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+            service:professional_services(id, name, description, duration_minutes, price)
+          `)
+          .single()
 
-      const { data, error } = await supabase
-        .from('appointments')
-        .insert({
-          ...appointmentData,
-          status: 'pending',
-          payment_status: 'pending',
-          confirmation_code: confirmationCode
+        if (error) {
+          console.error(`❌ createAppointment - Erro na tentativa ${attempts}:`, error)
+          console.error(`❌ createAppointment - Detalhes do erro:`, {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          })
+          
+          // Verificar se é erro de limite
+          if (error.message.includes('rate') || error.message.includes('limit') || error.message.includes('quota')) {
+            if (attempts < maxAttempts) {
+              const delay = Math.pow(2, attempts) * 1000 // Backoff exponencial: 2s, 4s, 8s
+              console.log(`⏳ createAppointment - Aguardando ${delay}ms antes da próxima tentativa...`)
+              await new Promise(resolve => setTimeout(resolve, delay))
+              continue
+            } else {
+              throw new Error('Limite de uso do Supabase excedido. Tente novamente em alguns minutos.')
+            }
+          }
+          
+          // Verificar se é erro de RLS
+          if (error.message.includes('permission') || error.message.includes('policy') || error.message.includes('RLS')) {
+            throw new Error('Erro de permissão. Verifique se você tem acesso para criar agendamentos.')
+          }
+          
+          // Verificar se é erro de constraint NOT NULL
+          if (error.message.includes('null value') && error.message.includes('not-null constraint')) {
+            throw new Error('Erro de estrutura do banco. Contate o administrador.')
+          }
+          
+          // Verificar se é erro de foreign key
+          if (error.message.includes('foreign key') || (error.message.includes('constraint') && !error.message.includes('not-null'))) {
+            throw new Error('Dados inválidos. Verifique se o cliente e serviço selecionados existem.')
+          }
+          
+          throw error
+        }
+
+        console.log('✅ createAppointment - Agendamento criado com sucesso:', data)
+        console.log('✅ createAppointment - Lista anterior:', appointments.length, 'agendamentos')
+        console.log('✅ createAppointment - Atualizando lista local...')
+
+        // Atualizar lista local
+        setAppointments(prev => {
+          const newList = [data, ...prev]
+          console.log('✅ createAppointment - Nova lista:', newList.length, 'agendamentos')
+          return newList
         })
-        .select(`
-          *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
-        `)
-        .single()
 
-      if (error) throw error
+        // Criar notificação se o agendamento foi criado como pending (cliente criou)
+        if (data.status === 'pending' && data.professional_id) {
+          console.log('🔔 Criando notificação de novo agendamento para profissional')
+          notifyAppointmentCreated(data).catch(err => 
+            console.error('❌ Erro ao criar notificação de novo agendamento:', err)
+          )
+        }
 
-      toast({
-        title: 'Agendamento criado!',
-        description: `Código de confirmação: ${confirmationCode}`,
-        variant: 'default'
-      })
+        return { data, error: null }
 
-      // Atualizar lista local
-      setAppointments(prev => [data, ...prev])
-
-      return { data, error: null }
-
-    } catch (err) {
-      console.error('❌ Erro ao criar agendamento:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
-      setError(errorMessage)
-      toast({
-        title: 'Erro ao criar agendamento',
-        description: errorMessage,
-        variant: 'destructive'
-      })
-      return { data: null, error: errorMessage }
-    } finally {
-      setLoading(false)
+      } catch (err) {
+        console.error(`❌ createAppointment - Erro na tentativa ${attempts}:`, err)
+        
+        // Se é a última tentativa, retornar erro
+        if (attempts >= maxAttempts) {
+          console.error('❌ createAppointment - Todas as tentativas falharam')
+          console.error('❌ createAppointment - Tipo do erro:', err instanceof Error ? err.constructor.name : typeof err)
+          console.error('❌ createAppointment - Stack trace:', err instanceof Error ? err.stack : 'N/A')
+          
+          let errorMessage = 'Erro desconhecido'
+          
+          if (err instanceof Error) {
+            errorMessage = err.message
+            
+            // Tratamento específico para erros de limite
+            if (err.message.includes('limit') || err.message.includes('rate') || err.message.includes('quota')) {
+              errorMessage = 'Limite de uso do Supabase excedido. Tente novamente em alguns minutos.'
+            }
+            
+            // Tratamento específico para erros de permissão
+            if (err.message.includes('permission') || err.message.includes('policy')) {
+              errorMessage = 'Erro de permissão. Verifique se você tem acesso para criar agendamentos.'
+            }
+            
+            // Tratamento específico para erros de foreign key
+            if (err.message.includes('foreign key') || err.message.includes('constraint')) {
+              errorMessage = 'Dados inválidos. Verifique se o cliente e serviço selecionados existem.'
+            }
+            
+            // Tratamento específico para erros de RLS
+            if (err.message.includes('RLS') || err.message.includes('row level security')) {
+              errorMessage = 'Erro de segurança. Verifique as políticas de acesso.'
+            }
+          }
+          
+          setError(errorMessage)
+          return { data: null, error: errorMessage }
+        }
+        
+        // Continuar para próxima tentativa
+      } finally {
+        if (attempts >= maxAttempts) {
+          setLoading(false)
+        }
+      }
     }
-  }, [toast])
+    
+    // Nunca deve chegar aqui, mas por segurança
+    return { data: null, error: 'Erro inesperado' }
+  }, []) // Removida dependência toast para evitar loops
 
   // Atualizar agendamento
   const updateAppointment = useCallback(async (appointmentId: string, updateData: UpdateAppointmentData) => {
@@ -256,20 +473,51 @@ export const useAppointments = () => {
       setLoading(true)
       setError(null)
 
+      // Buscar o agendamento atual para comparar status
+      const currentAppointment = appointments.find(apt => apt.id === appointmentId)
+      const oldStatus = currentAppointment?.status
+
+
       const { data, error } = await supabase
         .from('appointments')
         .update(updateData)
         .eq('id', appointmentId)
         .select(`
           *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
         `)
         .single()
 
       if (error) throw error
+
+      // Verificar se o status mudou e criar notificação apropriada
+      if (oldStatus !== updateData.status) {
+        // Criar notificação específica para cada status
+        if (updateData.status === 'confirmed') {
+          notifyAppointmentConfirmed(data).catch(err =>
+            console.error('❌ Erro ao criar notificação de confirmação:', err)
+          )
+        } else if (updateData.status === 'cancelled') {
+          notifyAppointmentCancelled(data).catch(err =>
+            console.error('❌ Erro ao criar notificação de cancelamento:', err)
+          )
+        } else if (updateData.status === 'no_show') {
+          notifyAppointmentNoShow(data).catch(err =>
+            console.error('❌ Erro ao criar notificação de não comparecimento:', err)
+          )
+        } else if (updateData.status === 'completed') {
+          notifyAppointmentCompleted(data).catch(err =>
+            console.error('❌ Erro ao criar notificação de conclusão:', err)
+          )
+        } else if (updateData.status === 'pending') {
+          notifyAppointmentPending(data).catch(err =>
+            console.error('❌ Erro ao criar notificação de alteração:', err)
+          )
+        }
+      }
 
       toast({
         title: 'Agendamento atualizado!',
@@ -295,21 +543,90 @@ export const useAppointments = () => {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, appointments, notifyAppointmentConfirmed, notifyAppointmentCancelled])
 
-  // Cancelar agendamento
+  // Cancelar agendamento (excluir completamente)
   const cancelAppointment = useCallback(async (appointmentId: string, reason?: string) => {
-    return updateAppointment(appointmentId, {
-      status: 'cancelled',
-      cancellation_reason: reason
-    })
-  }, [updateAppointment])
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Primeiro, buscar o agendamento para obter dados para notificação
+      const { data: appointmentData, error: fetchError } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
+        `)
+        .eq('id', appointmentId)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Erro ao buscar agendamento:', fetchError)
+        throw fetchError
+      }
+
+      // Excluir o agendamento completamente
+      const { error: deleteError } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId)
+
+      if (deleteError) {
+        console.error('❌ Erro ao excluir agendamento:', deleteError)
+        throw deleteError
+      }
+
+      // Criar notificação de cancelamento para o profissional
+      if (appointmentData) {
+        console.log('🔔 Criando notificação de cancelamento')
+        console.log('🔔 Dados do agendamento para notificação:', appointmentData)
+        console.log('🔔 Professional ID:', appointmentData.professional_id)
+        console.log('🔔 Client ID:', appointmentData.client_id)
+        
+        const notificationResult = await notifyAppointmentCancelled(appointmentData)
+        console.log('🔔 Resultado da notificação:', notificationResult)
+      } else {
+        console.error('❌ appointmentData não encontrado para notificação')
+      }
+
+      // Atualizar lista local removendo o agendamento
+      setAppointments(prev => prev.filter(apt => apt.id !== appointmentId))
+
+      toast({
+        title: 'Agendamento cancelado!',
+        description: 'O agendamento foi cancelado e a vaga liberada.',
+        variant: 'default'
+      })
+
+      return { data: null, error: null }
+
+    } catch (err) {
+      console.error('❌ Erro ao cancelar agendamento:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
+      setError(errorMessage)
+      toast({
+        title: 'Erro ao cancelar agendamento',
+        description: errorMessage,
+        variant: 'destructive'
+      })
+      return { data: null, error: errorMessage }
+    } finally {
+      setLoading(false)
+    }
+  }, [notifyAppointmentCancelled, toast])
 
   // Confirmar agendamento
   const confirmAppointment = useCallback(async (appointmentId: string) => {
-    return updateAppointment(appointmentId, {
+    const result = await updateAppointment(appointmentId, {
       status: 'confirmed'
     })
+
+    // Notificação já é criada dentro do updateAppointment
+    return result
   }, [updateAppointment])
 
   // Finalizar agendamento
@@ -319,6 +636,7 @@ export const useAppointments = () => {
     })
   }, [updateAppointment])
 
+
   // Buscar agendamentos por código de confirmação
   const getAppointmentByCode = useCallback(async (confirmationCode: string) => {
     try {
@@ -326,10 +644,10 @@ export const useAppointments = () => {
         .from('appointments')
         .select(`
           *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
         `)
         .eq('confirmation_code', confirmationCode.toUpperCase())
         .single()
@@ -351,10 +669,10 @@ export const useAppointments = () => {
         .from('appointments')
         .select(`
           *,
-          salon:salons_studios(id, name, address),
-          client:users(id, name, email, phone),
-          professional:users(id, name, email, profile_photo),
-          service:services(id, name, description, duration, price)
+          salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
+          client:users!appointments_client_id_fkey(id, name, email, phone),
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
+          service:professional_services(id, name, description, duration_minutes, price)
         `)
         .eq('date', date)
 
@@ -375,12 +693,8 @@ export const useAppointments = () => {
     }
   }, [])
 
-  // Carregar agendamentos do usuário atual
-  useEffect(() => {
-    if (user?.id) {
-      fetchAppointments()
-    }
-  }, [user?.id]) // Removida a dependência fetchAppointments que causa loop
+  // Carregar agendamentos do usuário atual (APENAS quando explicitamente chamado)
+  // useEffect removido para evitar carregamento automático que causa erros
 
   return {
     // Estado

@@ -34,6 +34,7 @@ interface NewPostModalProps {
   onPostDataChange: (data: any) => void
   onErrorsChange: (errors: {[key: string]: string}) => void
   errors: {[key: string]: string}
+  onPostCreated?: () => void
 }
 
 const NewPostModal = ({ 
@@ -44,7 +45,8 @@ const NewPostModal = ({
   postData, 
   onPostDataChange, 
   onErrorsChange,
-  errors 
+  errors,
+  onPostCreated
 }: NewPostModalProps) => {
   
   const [beforeAfterComplete, setBeforeAfterComplete] = useState(false)
@@ -74,6 +76,13 @@ const NewPostModal = ({
       ...postData,
       [field]: value
     })
+    
+    // Limpar erros específicos quando o usuário digita
+    if (errors[field]) {
+      const newErrors = { ...errors }
+      delete newErrors[field]
+      onErrorsChange(newErrors)
+    }
     
     // Se for a primeira etapa e o campo for postType, avançar automaticamente
     if (currentStep === 1 && field === 'postType') {
@@ -115,8 +124,8 @@ const NewPostModal = ({
     
     if (!postData.description.trim()) {
       newErrors.description = "Descrição é obrigatória"
-    } else if (postData.description.trim().length < 10) {
-      newErrors.description = "Descrição deve ter pelo menos 10 caracteres"
+    } else if (postData.description.trim().length < 5) {
+      newErrors.description = "Descrição deve ter pelo menos 5 caracteres"
     } else if (postData.description.trim().length > 2000) {
       newErrors.description = "Descrição deve ter no máximo 2000 caracteres"
     }
@@ -129,6 +138,7 @@ const NewPostModal = ({
   }
 
   const handleNextStep = async () => {
+    
     if (currentStep === 1) {
       // Step 1: Validar se tipo de post foi selecionado
       if (!postData.postType) {
@@ -154,9 +164,7 @@ const NewPostModal = ({
       onStepChange(3)
     } else if (currentStep === 3) {
       // Step 3: Validar informações e publicar
-      console.log('Tentando publicar post:', postData)
       const stepErrors = validateStep1()
-      console.log('Erros de validação:', stepErrors)
       
       if (Object.keys(stepErrors).length === 0) {
         onErrorsChange({}) // Limpar erros
@@ -187,7 +195,11 @@ const NewPostModal = ({
         if (result.success) {
           console.log('Post criado com sucesso!')
           onClose() // Fechar modal
-          // Aqui você pode adicionar lógica para atualizar a página BeautyWall
+          
+          // Chamar callback para atualizar a lista de posts
+          if (onPostCreated) {
+            onPostCreated()
+          }
         } else {
           console.log('Erro na criação do post:', result.error)
         }
@@ -339,7 +351,7 @@ const NewPostModal = ({
               rows={3}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Mínimo 10 caracteres</span>
+              <span>Mínimo 5 caracteres</span>
               <span>{postData.description.length}/2000</span>
             </div>
             {errors.description && (
@@ -475,10 +487,17 @@ const NewPostModal = ({
                        !postData.images?.length && !postData.videos?.length ||
                        (postData.postType === 'before-after' && !beforeAfterComplete)
                      )) ||
-                     (currentStep === 3 && Object.keys(errors).length > 0) ||
+                     (currentStep === 3 && (
+                       !postData.title.trim() || 
+                       postData.title.trim().length < 3 ||
+                       !postData.description.trim() || 
+                       postData.description.trim().length < 5 ||
+                       !postData.category ||
+                       Object.keys(errors).length > 0
+                     )) ||
                      isUploading
                    }
-                   title={`Step: ${currentStep}, Errors: ${Object.keys(errors).length}, Uploading: ${isUploading}`}
+                   title={`Step: ${currentStep}, Title: "${postData.title}", Description: "${postData.description}", Category: "${postData.category}", Errors: ${Object.keys(errors).length}, Uploading: ${isUploading}`}
                    className="flex items-center gap-1 text-xs px-3 py-1 h-8"
                    variant="hero"
                  >

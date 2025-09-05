@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { QrCode, Share2, Edit3, Heart, Users, UserPlus, MessageSquare, MapPin, Phone, Mail, Instagram, Facebook, Youtube, Linkedin, Sparkles, Star, Bookmark, ArrowLeftRight, ChevronLeft, ChevronRight } from "lucide-react"
+import { QrCode, Share2, Edit3, Heart, Users, UserPlus, MessageSquare, MapPin, Phone, Mail, Instagram, Facebook, Youtube, Linkedin, Sparkles, Star, Bookmark, ArrowLeftRight, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { BEAUTY_CATEGORIES } from "@/lib/constants"
 import { ProfilePhotoUpload } from "@/components/ProfilePhotoUpload"
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -25,6 +25,7 @@ import { PostModal } from "@/components/PostModal"
 import { EmployeeInvites } from "@/components/EmployeeInvites"
 import { ProfessionalInvites } from "@/components/ProfessionalInvites"
 import { WorkplaceCard } from "@/components/WorkplaceCard"
+import { ScheduleModal } from "@/components/ScheduleModal"
 
 import { MainPostButton } from "@/components/MainPostButton"
 import { useMainPosts } from "@/hooks/useMainPosts"
@@ -53,6 +54,7 @@ const Perfil = () => {
   const [showSkillsEditor, setShowSkillsEditor] = useState(false)
   const [showPostModal, setShowPostModal] = useState(false)
   const [selectedPost, setSelectedPost] = useState<any>(null)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [followModalType, setFollowModalType] = useState<'following' | 'followers'>('following')
   const [activityModalType, setActivityModalType] = useState<'favorites' | 'likes'>('favorites')
   const [modalTitle, setModalTitle] = useState('')
@@ -494,6 +496,16 @@ const Perfil = () => {
     }
   }
 
+  // Função para agendar horário com profissional
+  const handleScheduleClick = (professionalUser: any) => {
+    if (user) {
+      setShowScheduleModal(true)
+    } else {
+      // Se não estiver logado, redirecionar para login
+      navigate('/login')
+    }
+  }
+
   // Função para seguir/deixar de seguir
   const handleFollowToggle = async () => {
     if (!user?.id || !targetUserId || user.id === targetUserId) return
@@ -662,8 +674,7 @@ const Perfil = () => {
                   <h1 className="text-2xl font-bold">{displayUser?.name || 'Usuário'}</h1>
                   <p className="text-muted-foreground">@{displayUser?.nickname || 'usuario'}</p>
                   <Badge variant="secondary" className="mt-2">
-                    {displayUser?.user_type === 'profissional' ? 'Profissional' :
-                     displayUser?.user_type === 'admin' ? 'Administrador' : 'Usuário'}
+                    {displayUser?.user_type === 'profissional' ? 'Profissional' : 'Usuário'}
                   </Badge>
                   <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />
@@ -693,22 +704,37 @@ const Perfil = () => {
                       <Edit3 className="h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button 
-                      variant={isFollowing ? "outline" : "hero"}
-                      size="sm"
-                      onClick={handleFollowToggle}
-                      disabled={followLoading}
-                      className="px-4"
-                    >
-                      {followLoading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                      ) : isFollowing ? (
-                        <UserPlus className="h-4 w-4 mr-2" />
-                      ) : (
-                        <UserPlus className="h-4 w-4 mr-2" />
+                    <>
+                      <Button 
+                        variant={isFollowing ? "outline" : "hero"}
+                        size="sm"
+                        onClick={handleFollowToggle}
+                        disabled={followLoading}
+                        className="px-4"
+                      >
+                        {followLoading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                        ) : isFollowing ? (
+                          <UserPlus className="h-4 w-4 mr-2" />
+                        ) : (
+                          <UserPlus className="h-4 w-4 mr-2" />
+                        )}
+                        {isFollowing ? 'Seguindo' : 'Seguir'}
+                      </Button>
+                      
+                      {/* Botão de Agendamento - Apenas para profissionais */}
+                      {displayUser?.user_type === 'profissional' && (
+                        <Button 
+                          variant="beauty"
+                          size="sm"
+                          onClick={() => handleScheduleClick(displayUser)}
+                          className="px-4 ml-2"
+                        >
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Agendar
+                        </Button>
                       )}
-                      {isFollowing ? 'Seguindo' : 'Seguir'}
-                    </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1723,6 +1749,17 @@ const Perfil = () => {
             onSkillsUpdated={handleSkillsUpdated} 
           />
 
+          {/* Modal de Agendamento */}
+          <ScheduleModal
+            isOpen={showScheduleModal}
+            onClose={() => setShowScheduleModal(false)}
+            professional={{
+              id: displayUser?.id || '',
+              name: displayUser?.name || 'Profissional',
+              profile_photo: displayUser?.profile_photo,
+              salon_id: undefined // Será determinado pelo modal
+            }}
+          />
 
         </div>
       </div>

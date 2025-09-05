@@ -31,14 +31,7 @@ const converterUsuarioParaMembro = (dbUser: any, getCategoryNames: (ids: string[
   // Mapear UUIDs das categorias para nomes
   const nomesCategorias = getCategoryNames(dbUser.categories || [])
   
-  // Log para debug das categorias
-  console.log('🔍 Convertendo usuário:', {
-    id: dbUser.id,
-    name: dbUser.name,
-    user_type: dbUser.user_type,
-    categories: dbUser.categories,
-    nomesCategorias: nomesCategorias
-  })
+  // Debug removido para limpar console
   
   return {
     id: dbUser.id,
@@ -57,12 +50,7 @@ const converterUsuarioParaMembro = (dbUser: any, getCategoryNames: (ids: string[
 
 // Função para converter salões para formato de membros
 const converterSalonParaMembro = (salon: any) => {
-  console.log('🔍 Convertendo salão:', {
-    id: salon.id,
-    name: salon.name,
-    owner: salon.owner,
-    cover_photo: salon.cover_photo
-  })
+  // Debug removido para limpar console
   
   return {
     id: salon.id,
@@ -190,93 +178,60 @@ const Membros = () => {
     }
   }, [user, carregando, dbHasMore, loadMoreDbUsers, dbLoading])
 
+  // Trava para evitar loops infinitos
+  const [loopProtection, setLoopProtection] = useState(0)
+  useEffect(() => {
+    if (loopProtection > 10) {
+      console.error('🚨 LOOP INFINITO DETECTADO NA PÁGINA MEMBROS - Parando execução')
+      return
+    }
+    setLoopProtection(prev => prev + 1)
+  }, [dbUsers.length, dbSalons.length, membrosExibidos.length])
+
   // Carregar membros iniciais e aplicar filtros
   useEffect(() => {
-    console.log('🔄 Atualizando membros exibidos:', {
-      dbUsersLength: dbUsers.length,
-      dbSalonsLength: dbSalons.length,
-      user: !!user,
-      membrosFiltrados: dbUsers.length + dbSalons.length,
-      tipoMembro,
-      dbLoading,
-      dbError,
-      hasMore: dbHasMore
-    })
-    
-    // Log dos tipos de usuários para debug
-    const tiposUsuarios = dbUsers.map(u => ({ id: u.id, name: u.name, user_type: u.user_type }))
-    console.log('👥 Tipos de usuários carregados:', tiposUsuarios)
-    
-    // Log dos salões para debug
-    const tiposSalons = dbSalons.map(s => ({ id: s.id, name: s.name, owner: s.owner?.name }))
-    console.log('🏢 Salões carregados:', tiposSalons)
+    // Debug removido para limpar console
     
     if (dbError) {
       console.error('❌ Erro no banco de dados:', dbError)
       
       // Se for erro de rate limit, mostrar mensagem específica
       if (dbError.includes('Rate limit') || dbError.includes('limite excedido')) {
-        console.log('⚠️ Rate limit do Supabase detectado - usando fallback')
+        // Rate limit detectado
       }
     }
     
     if (dbLoading) {
-      console.log('⏳ Carregando dados do banco...')
+      // Carregando dados do banco
     }
     
     // Converter usuários do banco para formato de membros
     const membrosUsuarios = dbUsers.map(user => converterUsuarioParaMembro(user, getCategoryNames))
     
+    // Adicionar o usuário logado se ele for profissional e não estiver na lista
+    const usuarioLogadoNaLista = dbUsers.find(u => u.id === user?.id)
+    if (user && !usuarioLogadoNaLista && user.user_type === 'profissional') {
+      // Adicionando usuário logado à lista
+      const membroLogado = converterUsuarioParaMembro(user, getCategoryNames)
+      membrosUsuarios.unshift(membroLogado) // Adicionar no início da lista
+    }
+    
     // Converter salões para formato de membros (apenas quando filtro for profissionais)
     const membrosSalons = tipoMembro === "profissionais" ? 
       dbSalons.map(salon => converterSalonParaMembro(salon)) : []
     
-    // Criar membros adicionais para proprietários de salões (quando filtro for profissionais)
-    const membrosProprietarios = tipoMembro === "profissionais" ? 
-      dbSalons
-        .filter(salon => salon.owner && salon.owner.user_type === 'profissional')
-        .map(salon => ({
-          id: `proprietario-${salon.owner.id}`,
-          nome: salon.owner.name || 'Proprietário',
-          nickname: (salon.owner as any).nickname || 'proprietario',
-          tipo: 'Profissional',
-          cidade: (salon.owner as any).cidade && (salon.owner as any).uf ? `${(salon.owner as any).cidade}, ${(salon.owner as any).uf}` : 'Localização não informada',
-          bairro: (salon.owner as any).bairro || '',
-          habilidades: (salon.owner as any).categories ? getCategoryNames((salon.owner as any).categories) : ['Proprietário'],
-          avatar: salon.owner.profile_photo || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-          isFromDb: true,
-          dbUser: salon.owner,
-          isSalon: false,
-          isProprietario: true,
-          salaoId: salon.id,
-          salaoNome: salon.name
-        })) : []
+    // Combinar usuários e salões (removida lógica de proprietários duplicados)
+    const membrosConvertidos = [...membrosUsuarios, ...membrosSalons]
     
-    // Combinar usuários, salões e proprietários
-    const membrosConvertidos = [...membrosUsuarios, ...membrosSalons, ...membrosProprietarios]
+    // Membros convertidos
     
-    console.log('🔄 Membros convertidos:', {
-      usuarios: membrosUsuarios.length,
-      saloes: membrosSalons.length,
-      proprietarios: membrosProprietarios.length,
-      total: membrosConvertidos.length
-    })
+
     
-    // Debug: verificar se o Rodrigo está nos dados
-    const rodrigoUsuario = dbUsers.find(u => u.name?.toLowerCase().includes('rodrigo'))
-    const rodrigoSalon = dbSalons.find(s => s.name?.toLowerCase().includes('rodrigo') || s.owner?.name?.toLowerCase().includes('rodrigo'))
-    
-    console.log('🔍 Debug Rodrigo:', {
-      encontradoComoUsuario: !!rodrigoUsuario,
-      encontradoComoSalon: !!rodrigoSalon,
-      dadosUsuario: rodrigoUsuario ? { id: rodrigoUsuario.id, name: rodrigoUsuario.name, user_type: rodrigoUsuario.user_type } : null,
-      dadosSalon: rodrigoSalon ? { id: rodrigoSalon.id, name: rodrigoSalon.name, owner: rodrigoSalon.owner?.name } : null
-    })
+
     
     // Fallback temporário para desktop quando não há dados
     if (membrosConvertidos.length === 0 && !dbLoading && !user) {
-      console.log('⚠️ Nenhum dado do banco - usando fallback temporário para desktop')
-      console.log('💡 Isso pode ser devido ao "Exceeding usage limits" no Supabase')
+      // Nenhum dado do banco - usando fallback temporário
       
         const fallbackMembros = [
           {
@@ -320,11 +275,11 @@ const Membros = () => {
     
     if (user) {
       // Usuário logado: carrega todos os membros do banco
-      console.log('👤 Usuário logado - carregando todos os membros')
+      // Usuário logado - carregando todos os membros
       setMembrosExibidos(membrosConvertidos)
       } else {
       // Usuário não logado: apenas 3 membros do banco
-      console.log('👤 Usuário não logado - carregando apenas 3 membros')
+      // Usuário não logado - carregando apenas 3 membros
         setMembrosExibidos(membrosConvertidos.slice(0, 3))
     }
     
@@ -391,7 +346,7 @@ const Membros = () => {
         navigate(`/perfil/${membro.id}`)
       }
     } else {
-      console.log('ID do membro não encontrado para navegação')
+      // ID do membro não encontrado para navegação
     }
   }
 
@@ -436,7 +391,7 @@ const Membros = () => {
 
   // Função para limpar filtros
   const limparFiltros = () => {
-    console.log('🔄 Limpando filtros...')
+    // Limpando filtros
     setTipoMembro("profissionais")
     setBusca("")
     setHabilidadeFiltro("todas")
@@ -646,37 +601,9 @@ const Membros = () => {
 
 
 
-        {/* DEBUG VISUAL - REMOVER DEPOIS */}
-        {user && (
-          <Card className="mb-6 bg-blue-50 border-blue-200">
-            <CardContent className="p-4">
-              <h3 className="font-bold text-blue-800 mb-2">🔍 DEBUG - Info dos Membros</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p><strong>Usuários encontrados:</strong> {dbUsers.length}</p>
-                  <p><strong>Salões encontrados:</strong> {dbSalons.length}</p>
-                  <p><strong>Proprietários profissionais:</strong> {dbSalons.filter(s => s.owner?.user_type === 'profissional').length}</p>
-                  <p><strong>Total exibido:</strong> {membrosExibidos.length}</p>
-                  <p><strong>Tipo filtro:</strong> {tipoMembro}</p>
-                  <p><strong>Carregando:</strong> {dbLoading ? 'Sim' : 'Não'}</p>
-                  <p><strong>Erro:</strong> {dbError || 'Nenhum'}</p>
-                </div>
-                <div>
-                  <p><strong>Rodrigo como usuário:</strong> {dbUsers.find(u => u.name?.toLowerCase().includes('rodrigo')) ? '✅ SIM' : '❌ NÃO'}</p>
-                  <p><strong>Rodrigo como salão:</strong> {dbSalons.find(s => s.name?.toLowerCase().includes('rodrigo') || s.owner?.name?.toLowerCase().includes('rodrigo')) ? '✅ SIM' : '❌ NÃO'}</p>
-                  {dbUsers.find(u => u.name?.toLowerCase().includes('rodrigo')) && (
-                    <p><strong>Tipo Rodrigo:</strong> {dbUsers.find(u => u.name?.toLowerCase().includes('rodrigo'))?.user_type}</p>
-                  )}
-                  {dbSalons.find(s => s.name?.toLowerCase().includes('rodrigo') || s.owner?.name?.toLowerCase().includes('rodrigo')) && (
-                    <p><strong>Salão Rodrigo:</strong> {dbSalons.find(s => s.name?.toLowerCase().includes('rodrigo') || s.owner?.name?.toLowerCase().includes('rodrigo'))?.name}</p>
-                  )}
-                  <p><strong>Problema identificado:</strong> Rodrigo só existe como proprietário do salão, não como profissional individual</p>
-                  <p><strong>Solução:</strong> Mostrar Rodrigo como profissional quando for proprietário de salão</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
+
+
 
         {/* Lista de Membros */}
         {membrosExibidos.length === 0 ? (
@@ -719,12 +646,11 @@ const Membros = () => {
             >
               {/* Foto de capa para salões */}
               {membro.isSalon && membro.coverPhoto && (
-                <div className="w-full h-20 bg-gradient-to-r from-primary/20 to-secondary/20 relative overflow-hidden">
+                <div className="w-full h-40 bg-gradient-to-r from-primary/20 to-secondary/20 relative overflow-hidden">
                   <img
                     src={membro.coverPhoto}
                     alt={`Capa de ${membro.nome}`}
                     className="w-full h-40 object-cover object-top"
-                    style={{ marginTop: '-10px' }}
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-black/10"></div>
@@ -757,14 +683,14 @@ const Membros = () => {
                 </Button>
               )}
 
-              <CardContent className={`p-6 ${membro.isSalon && membro.coverPhoto ? 'pt-12' : ''}`}>
+              <CardContent className={`p-6 ${membro.isSalon && membro.coverPhoto ? 'pt-20' : ''}`}>
                 <div className="text-center">
                   {/* Área clicável para ir ao perfil */}
                   <div 
                     className="cursor-pointer hover:scale-105 transition-transform"
                     onClick={() => handleMembroClick(membro)}
                   >
-                    <Avatar className={`w-20 h-20 mx-auto mb-4 ${membro.isSalon && membro.coverPhoto ? 'relative -mt-10 border-4 border-background' : ''}`}>
+                    <Avatar className={`w-20 h-20 mx-auto mb-4 ${membro.isSalon && membro.coverPhoto ? 'relative -mt-20 ring-4 ring-background shadow-lg' : ''}`}>
                     <AvatarImage src={membro.avatar} alt={membro.nome} />
                     <AvatarFallback className="bg-gradient-primary text-white font-semibold text-xl">
                       {membro.nome.charAt(0)}
@@ -869,16 +795,7 @@ const Membros = () => {
           const totalItems = dbUsers.length + (tipoMembro === "profissionais" ? dbSalons.length : 0)
           const shouldShow = user && !carregando && !dbLoading && totalItems > 0 && (!dbHasMore || chegouAoFinal)
           if (shouldShow) {
-            console.log('🎯 Mostrando mensagem de fim da lista:', {
-              user: !!user,
-              carregando,
-              dbLoading,
-              chegouAoFinal,
-              dbHasMore,
-              dbUsersLength: dbUsers.length,
-              dbSalonsLength: dbSalons.length,
-              totalItems
-            })
+            // Mostrando mensagem de fim da lista
           }
           return shouldShow
         })() && (

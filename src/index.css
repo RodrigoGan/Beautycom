@@ -158,3 +158,55 @@ Paleta: Roxo/Magenta + Coral/Laranja + Neutros elegantes
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
 }
+
+/* Estilos específicos para mobile - Remove hover problemático */
+@media (max-width: 768px) {
+  /* Remove hover em botões de toggle no mobile */
+  button[class*="flex items-center gap-2"] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Remove hover states no mobile */
+  button[class*="flex items-center gap-2"]:hover,
+  button[class*="flex items-center gap-2"]:active,
+  button[class*="flex items-center gap-2"]:focus {
+    background-color: inherit !important;
+    color: inherit !important;
+    border-color: inherit !important;
+    box-shadow: inherit !important;
+  }
+  
+  /* Força estados visuais claros */
+  button[class*="flex items-center gap-2"]:not([class*="bg-gradient-to-r"]) {
+    background-color: white !important;
+    color: rgb(55 65 81) !important; /* text-gray-700 */
+    border-color: rgb(229 231 235) !important; /* border-gray-200 */
+  }
+  
+  button[class*="flex items-center gap-2"][class*="bg-gradient-to-r"] {
+    background: linear-gradient(to right, rgb(147 51 234), rgb(236 72 153)) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1) !important;
+  }
+}
+
+/* Estilos específicos para avatares - garantir proporção correta */
+[data-radix-avatar-image] {
+  object-fit: cover !important;
+  object-position: center !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Garantir que avatares mantenham proporção quadrada */
+[data-radix-avatar-root] {
+  aspect-ratio: 1 / 1 !important;
+  overflow: hidden !important;
+}

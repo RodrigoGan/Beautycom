@@ -297,8 +297,9 @@ export function useServices() {
   const getServices = async () => {
     try {
       const { data, error } = await supabase
-        .from('services')
+        .from('professional_services')
         .select('*')
+        .eq('is_active', true)
         .order('name')
 
       if (error) throw error
@@ -317,13 +318,15 @@ export function useServices() {
   const createService = async (serviceData: {
     name: string
     description: string
-    duration: number
+    duration_minutes: number
     price: number
     category: string
+    professional_id: string
+    salon_id: string
   }) => {
     try {
       const { data, error } = await supabase
-        .from('services')
+        .from('professional_services')
         .insert(serviceData)
         .select()
         .single()

@@ -20,6 +20,7 @@ export interface SalonProfessional {
     email: string
     profile_photo?: string
     user_type: string
+    agenda_enabled?: boolean // ✅ Adicionado campo agenda_enabled
   }
   enabled_by_user?: {
     id: string
@@ -64,14 +65,14 @@ export const useSalonProfessionals = (salonId: string) => {
         return
       }
 
-      // Buscar dados dos usuários profissionais
+      // Buscar dados dos usuários profissionais (incluindo agenda_enabled)
       const professionalIds = salonProData.map(sp => sp.professional_id).filter(Boolean)
       const enabledByIds = salonProData.map(sp => sp.agenda_enabled_by).filter(Boolean)
       const allUserIds = [...new Set([...professionalIds, ...enabledByIds])]
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, name, email, profile_photo, user_type')
+        .select('id, name, email, profile_photo, user_type, agenda_enabled')
         .in('id', allUserIds)
 
       if (usersError) {
@@ -102,6 +103,19 @@ export const useSalonProfessionals = (salonId: string) => {
           return acc
         }, {} as Record<string, number>)
         console.log('📊 Status dos profissionais:', statusCount)
+        
+        // Log detalhado de cada profissional para debug
+        data.forEach(prof => {
+          console.log('🔍 Profissional:', {
+            id: prof.id,
+            professional_id: prof.professional_id,
+            professional_name: prof.professional?.name,
+            agenda_enabled: prof.agenda_enabled,
+            user_agenda_enabled: prof.professional?.agenda_enabled,
+            agenda_enabled_at: prof.agenda_enabled_at,
+            agenda_enabled_by: prof.agenda_enabled_by
+          })
+        })
       }
       
       setProfessionals(data || [])
@@ -139,7 +153,7 @@ export const useSalonProfessionals = (salonId: string) => {
         })
         .select(`
           *,
-          professional:users(id, name, email, profile_photo, user_type)
+          professional:users!salon_professionals_professional_id_fkey(id, name, email, profile_photo, user_type)
         `)
         .single()
 
@@ -175,7 +189,7 @@ export const useSalonProfessionals = (salonId: string) => {
         .eq('salon_id', salonId)
         .select(`
           *,
-          professional:users(id, name, email, profile_photo, user_type)
+          professional:users!salon_professionals_professional_id_fkey(id, name, email, profile_photo, user_type)
         `)
         .single()
 
@@ -211,7 +225,7 @@ export const useSalonProfessionals = (salonId: string) => {
         .eq('salon_id', salonId)
         .select(`
           *,
-          professional:users(id, name, email, profile_photo, user_type)
+          professional:users!salon_professionals_professional_id_fkey(id, name, email, profile_photo, user_type)
         `)
         .single()
 
@@ -266,12 +280,17 @@ export const useSalonProfessionals = (salonId: string) => {
 
   // Habilitar agenda para profissional
   const enableAgenda = useCallback(async (professionalId: string) => {
+    if (!salonId) {
+      console.error('❌ salonId é obrigatório para habilitar agenda')
+      throw new Error('ID do salão é obrigatório')
+    }
+
     try {
       setError(null)
 
       console.log('✅ Habilitando agenda para profissional:', professionalId)
 
-      // Primeiro, atualizar o registro
+      // 1. Primeiro, atualizar o registro na tabela salon_professionals
       const { data: updateData, error: updateError } = await supabase
         .from('salon_professionals')
         .update({ 
@@ -279,23 +298,82 @@ export const useSalonProfessionals = (salonId: string) => {
           agenda_enabled_at: new Date().toISOString(),
           agenda_enabled_by: user?.id
         })
-        .eq('id', professionalId)
+        .eq('professional_id', professionalId)
         .eq('salon_id', salonId)
         .select('*')
         .single()
 
       if (updateError) {
-        console.error('❌ Erro ao atualizar agenda:', updateError)
+        console.error('❌ Erro ao atualizar salon_professionals:', updateError)
         throw updateError
       }
 
-      console.log('✅ Agenda atualizada no banco:', updateData)
+      // 2. Atualizar também a tabela users (agenda global)
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({ agenda_enabled: true })
+        .eq('id', updateData.professional_id)
 
-      // Buscar dados do profissional e quem habilitou
+      if (userUpdateError) {
+        console.error('❌ Erro ao atualizar users:', userUpdateError)
+        throw userUpdateError
+      }
+
+      // 3. Adicionar o profissional à subscription_professionals (se não existir)
+      // Primeiro, buscar a assinatura ativa do dono do salão
+      const { data: salonData } = await supabase
+        .from('salons_studios')
+        .select('owner_id')
+        .eq('id', salonId)
+        .single()
+
+      if (salonData?.owner_id) {
+        // Buscar a assinatura ativa do dono
+        const { data: subscriptionData } = await supabase
+          .from('user_subscriptions')
+          .select('id')
+          .eq('user_id', salonData.owner_id)
+          .eq('status', 'active')
+          .single()
+
+        if (subscriptionData) {
+          // Verificar se o profissional já está na subscription_professionals
+          const { data: existingSubscription } = await supabase
+            .from('subscription_professionals')
+            .select('id')
+            .eq('subscription_id', subscriptionData.id)
+            .eq('professional_id', professionalId)
+            .single()
+
+          if (!existingSubscription) {
+            // Adicionar o profissional à subscription_professionals
+            const { error: subscriptionError } = await supabase
+              .from('subscription_professionals')
+              .insert({
+                subscription_id: subscriptionData.id,
+                professional_id: professionalId,
+                status: 'active',
+                enabled_by: user?.id, // Adicionar o ID do usuário que habilitou
+                created_at: new Date().toISOString()
+              })
+
+            if (subscriptionError) {
+              console.error('❌ Erro ao adicionar à subscription_professionals:', subscriptionError)
+              // Não falhar a operação por causa disso, apenas logar
+            } else {
+              console.log('✅ Profissional adicionado à subscription_professionals')
+            }
+          }
+        }
+      }
+
+      console.log('✅ Agenda habilitada no banco (salon_professionals, users e subscription_professionals):', updateData)
+
+      // 4. Buscar dados atualizados do profissional e quem habilitou
       const userIds = [updateData.professional_id, updateData.agenda_enabled_by].filter(Boolean)
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, name, email, profile_photo, user_type')
+        .select('id, name, email, profile_photo, user_type, agenda_enabled')
         .in('id', userIds)
 
       // Combinar os dados
@@ -309,7 +387,7 @@ export const useSalonProfessionals = (salonId: string) => {
 
       // Atualizar o estado local
       setProfessionals(prev => {
-        const updated = prev.map(prof => prof.id === professionalId ? combinedData : prof)
+        const updated = prev.map(prof => prof.professional_id === professionalId ? combinedData : prof)
         console.log('✅ Estado atualizado:', updated)
         return updated
       })
@@ -326,12 +404,17 @@ export const useSalonProfessionals = (salonId: string) => {
 
   // Desabilitar agenda para profissional
   const disableAgenda = useCallback(async (professionalId: string) => {
+    if (!salonId) {
+      console.error('❌ salonId é obrigatório para desabilitar agenda')
+      throw new Error('ID do salão é obrigatório')
+    }
+
     try {
       setError(null)
 
       console.log('❌ Desabilitando agenda para profissional:', professionalId)
 
-      // Primeiro, atualizar o registro
+      // 1. Primeiro, atualizar o registro na tabela salon_professionals
       const { data: updateData, error: updateError } = await supabase
         .from('salon_professionals')
         .update({ 
@@ -339,26 +422,71 @@ export const useSalonProfessionals = (salonId: string) => {
           agenda_enabled_at: null,
           agenda_enabled_by: null
         })
-        .eq('id', professionalId)
+        .eq('professional_id', professionalId)
         .eq('salon_id', salonId)
         .select('*')
         .single()
 
       if (updateError) {
-        console.error('❌ Erro ao atualizar agenda:', updateError)
+        console.error('❌ Erro ao atualizar salon_professionals:', updateError)
         throw updateError
       }
 
-      console.log('✅ Agenda desabilitada no banco:', updateData)
+      // 2. Atualizar também a tabela users (agenda global)
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({ agenda_enabled: false })
+        .eq('id', updateData.professional_id)
 
-      // Buscar dados do profissional
+      if (userUpdateError) {
+        console.error('❌ Erro ao atualizar users:', userUpdateError)
+        throw userUpdateError
+      }
+
+      // 3. Remover o profissional da subscription_professionals
+      // Primeiro, buscar a assinatura ativa do dono do salão
+      const { data: salonData } = await supabase
+        .from('salons_studios')
+        .select('owner_id')
+        .eq('id', salonId)
+        .single()
+
+      if (salonData?.owner_id) {
+        // Buscar a assinatura ativa do dono
+        const { data: subscriptionData } = await supabase
+          .from('user_subscriptions')
+          .select('id')
+          .eq('user_id', salonData.owner_id)
+          .eq('status', 'active')
+          .single()
+
+        if (subscriptionData) {
+          // Remover o profissional da subscription_professionals
+          const { error: subscriptionError } = await supabase
+            .from('subscription_professionals')
+            .delete()
+            .eq('subscription_id', subscriptionData.id)
+            .eq('professional_id', professionalId)
+
+          if (subscriptionError) {
+            console.error('❌ Erro ao remover da subscription_professionals:', subscriptionError)
+            // Não falhar a operação por causa disso, apenas logar
+          } else {
+            console.log('✅ Profissional removido da subscription_professionals')
+          }
+        }
+      }
+
+      console.log('✅ Agenda desabilitada no banco (salon_professionals, users e subscription_professionals):', updateData)
+
+      // 4. Buscar dados atualizados do profissional
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, name, email, profile_photo, user_type')
+        .select('id, name, email, profile_photo, user_type, agenda_enabled')
         .eq('id', updateData.professional_id)
         .single()
 
-      // Combinar os dados
+      // 5. Combinar os dados
       const combinedData = {
         ...updateData,
         professional: usersData || null,
@@ -367,9 +495,9 @@ export const useSalonProfessionals = (salonId: string) => {
 
       console.log('✅ Dados combinados:', combinedData)
 
-      // Atualizar o estado local
+      // 6. Atualizar o estado local
       setProfessionals(prev => {
-        const updated = prev.map(prof => prof.id === professionalId ? combinedData : prof)
+        const updated = prev.map(prof => prof.professional_id === professionalId ? combinedData : prof)
         console.log('✅ Estado atualizado:', updated)
         return updated
       })

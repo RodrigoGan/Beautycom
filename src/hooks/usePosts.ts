@@ -31,7 +31,6 @@ export interface PostsFilters {
 }
 
 export const usePosts = () => {
-  console.log('🔄 usePosts hook inicializado')
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,15 +58,12 @@ export const usePosts = () => {
   const retryWithBackoff = async (fn: () => Promise<any>, maxRetries: number = 2) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔄 Tentativa ${attempt}/${maxRetries}...`)
         return await executeQueryWithTimeout(fn, 5000)
       } catch (error) {
-        console.error(`❌ Tentativa ${attempt} falhou:`, error)
         if (attempt === maxRetries) {
           throw error
         }
         const delay = Math.pow(2, attempt) * 1000 // 2s, 4s
-        console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
@@ -84,10 +80,7 @@ export const usePosts = () => {
       const to = from + pageSize - 1
       const filtersToUse = customFilters || filters
 
-      console.log('🔍 Buscando posts:', { currentPage, from, to, filters: filtersToUse, customFilters: !!customFilters })
-      
       // Teste de conectividade básica com retry reduzido
-      console.log('🔍 Testando conectividade básica...')
       try {
         const { data: testData, error: testError } = await retryWithBackoff(async () => {
           return await requestLimiter.execute(async () => 
@@ -119,9 +112,9 @@ export const usePosts = () => {
           return
         }
         
-        console.log('✅ Conectividade com Supabase OK')
+        // Conectividade OK
       } catch (error) {
-        console.error('❌ Erro na conectividade após retry:', error)
+        // Erro na conectividade
         
         // Detectar rate limits em erros de timeout
         if (error instanceof Error && 
@@ -265,7 +258,7 @@ export const usePosts = () => {
       }
 
       // Executar query principal com retry
-      console.log('📡 Fazendo requisição para Supabase...')
+      // Fazendo requisição para Supabase
       const startTime = Date.now()
       
       const { data, error: fetchError } = await retryWithBackoff(async () => {
@@ -284,25 +277,9 @@ export const usePosts = () => {
         return
       }
       
-      console.log('⏱️ Query executada em', Date.now() - startTime, 'ms')
-      console.log('📊 Posts encontrados:', data?.length || 0)
+      // Query executada
       
-      // Log específico para "Sobrancelhas / Cílios"
-      if (filtersToUse.category === 'Sobrancelhas / Cílios') {
-        console.log('🔍 DEBUG: Posts retornados para Sobrancelhas/Cílios:', data?.length || 0)
-        if (data && data.length > 0) {
-          console.log('🔍 DEBUG: Primeiros posts retornados:', data.slice(0, 3).map(p => ({
-            id: p.id,
-            title: p.title,
-            category_id: p.category_id,
-            post_type: p.post_type
-          })))
-        }
-      }
-      
-      if (data && data.length > 0) {
-        console.log('📋 Primeiros posts:', data.slice(0, 3).map(p => p.title))
-      }
+      // Logs removidos para limpar console
 
       // Atualizar posts
       if (resetPage) {
@@ -369,12 +346,10 @@ export const usePosts = () => {
 
   // Busca inicial - CORRIGIDO para evitar loops infinitos
   useEffect(() => {
-    console.log('🔄 useEffect do usePosts - isInitialized:', isInitialized, 'loading:', loading)
     if (!isInitialized && !loading) {
-      console.log('🚀 Iniciando busca inicial de posts...')
       fetchPosts(true)
     }
-  }, [isInitialized, loading]) // Removido fetchPosts das dependências
+  }, [isInitialized, loading, fetchPosts])
 
   return {
     posts,

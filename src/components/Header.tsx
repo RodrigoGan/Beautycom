@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Menu, X, Bell, User, LogOut, Building2 } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useSalons } from "@/hooks/useSalons"
-import { useSalonPermissions } from "@/hooks/useSalonPermissions"
+// import { useSalonPermissions } from "@/hooks/useSalonPermissions" // REMOVIDO TEMPORARIAMENTE
+// import { useSalonProfessionals } from "@/hooks/useSalonProfessionals" // REMOVIDO - não utilizado
+import { supabase } from "@/lib/supabase"
+import { NotificationDropdown } from "@/components/NotificationDropdown"
 
 
 export function Header() {
@@ -15,41 +19,51 @@ export function Header() {
   const isLoggedIn = !!user
   const menuRef = useRef<HTMLDivElement>(null)
   
-  // Hook para gerenciar salões
+  // Hook para gerenciar salões - restaurado para funcionar com profissionais
   const { userSalon, loading: salonLoading } = useSalons(user?.id)
   
-  // Hook para permissões do salão
-  const { hasPermission, isOwner, isEmployee } = useSalonPermissions(userSalon?.id)
+  // Lógica de permissões restaurada
+  const isOwner = () => user?.id === userSalon?.owner_id
+  const hasPermission = (permission: string) => isOwner() // Apenas donos têm todas as permissões
+  const isEmployee = () => false // REMOVIDO TEMPORARIAMENTE
   
-  // Verificar se pode acessar agenda profissional
+  // Hook para buscar TODOS os salões onde o usuário é profissional - REMOVIDO TEMPORARIAMENTE
+  // const [userAsProfessional, setUserAsProfessional] = useState<any[]>([])
+  // const [userAsProfessionalLoading, setUserAsProfessionalLoading] = useState(false)
+  
+  // Verificar se pode acessar agenda profissional (lógica completa restaurada)
   const canAccessProfessionalAgenda = () => {
+    
     if (!user) return false
     
-    // Profissionais sempre podem acessar
-    if (user.user_type === 'profissional') return true
+    // 1. Dono de salão pode acessar
+    if (userSalon?.owner_id === user.id) return true
     
-    // Funcionários com permissão podem acessar
+    // 2. QUALQUER usuário do tipo 'profissional' pode acessar
+    if (user?.user_type === 'profissional') return true
+    
+    // 3. Funcionários com permissão podem acessar (com limitações baseadas em permissões)
     if (isEmployee() && hasPermission('appointments.view')) return true
-    
-    // Dono do salão pode acessar
-    if (isOwner()) return true
     
     return false
   }
   
-  // Debug logs
-  console.log('🔍 Header Debug:', {
-    userId: user?.id,
-    userSalon,
-    salonLoading,
-    isLoggedIn
-  })
+  // Debug removido para evitar loops
 
   const handleSignOut = async () => {
-    await signOut()
-    setIsMenuOpen(false)
-    // Redirecionar para a página inicial após o logout
-    navigate('/')
+    console.log('🔍 Header - Iniciando logout...')
+    console.log('🔍 Header - Usuário antes do logout:', user?.id)
+    
+    try {
+      await signOut()
+      console.log('🔍 Header - Logout executado com sucesso')
+      setIsMenuOpen(false)
+      // Redirecionar para a página inicial após o logout
+      navigate('/')
+      console.log('🔍 Header - Redirecionamento executado')
+    } catch (error) {
+      console.error('❌ Header - Erro no logout:', error)
+    }
   }
 
   // Fechar menu quando clicar fora dele ou pressionar Escape
@@ -82,6 +96,48 @@ export function Header() {
     setIsMenuOpen(false)
   }, [location.pathname])
 
+  // Função para buscar salões onde o usuário é profissional - REMOVIDO TEMPORARIAMENTE
+  // const fetchUserAsProfessional = useCallback(async () => {
+  //   if (!user?.id) return
+  //   
+  //   try {
+  //     setUserAsProfessionalLoading(true)
+  //     console.log('🔍 Header - Buscando salões onde usuário é profissional:', user.id)
+  //     
+  //     const { data, error } = await supabase
+  //       .from('salon_professionals')
+  //       .select(`
+  //         *,
+  //         salon:salons_studios(id, name, owner_id)
+  //       `)
+  //       .eq('professional_id', user.id)
+  //       .eq('status', 'accepted')
+  //       .eq('agenda_enabled', true)
+  //   
+  //   if (error) {
+  //       console.error('❌ Header - Erro ao buscar salões do usuário:', error)
+  //       return
+  //     }
+  //     
+  //     console.log('✅ Header - Salões onde usuário é profissional:', data)
+  //     setUserAsProfessional(data || [])
+  //     
+  //   } catch (err) {
+  //     console.error('❌ Header - Erro ao buscar salões do usuário:', err)
+  //   } finally {
+  //     setUserAsProfessionalLoading(false)
+  //   }
+  // }, [user?.id])
+
+  // Debug removido para evitar loops
+
+  // Executar busca de salões onde usuário é profissional - REMOVIDO TEMPORARIAMENTE
+  // useEffect(() => {
+  //   if (user?.id) {
+  //     fetchUserAsProfessional()
+  //   }
+  // }, [user?.id, fetchUserAsProfessional])
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
       <div ref={menuRef} className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -98,75 +154,33 @@ export function Header() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Elementos Essenciais - Visíveis em todas as telas */}
+          <div className="flex items-center space-x-2">
             {isLoggedIn ? (
               <>
-                <Button variant="ghost" size="icon">
-                  <Bell className="h-5 w-5" />
-                </Button>
+                {/* Sistema de Notificações */}
+                <NotificationDropdown salonId={userSalon?.id} />
                 
-                {/* Links das Agendas */}
-                <Link to="/agenda-pessoal">
-                  <Button variant="ghost" size="sm">
-                    Agenda Pessoal
-                  </Button>
+                {/* Nome do Usuário */}
+                <span className="hidden sm:inline text-sm text-muted-foreground">
+                  Olá, {user?.name || user?.nickname || 'Usuário'}
+                </span>
+                
+                {/* Avatar do Usuário */}
+                <Link to="/perfil">
+                  <Avatar className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
+                    <AvatarImage 
+                      src={user?.profile_photo} 
+                      alt={user?.name || user?.nickname || 'Usuário'} 
+                    />
+                    <AvatarFallback className="bg-gradient-primary text-white text-sm font-semibold">
+                      {user?.name?.charAt(0)?.toUpperCase() || user?.nickname?.charAt(0)?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                 </Link>
-                
-                {/* Agenda Profissional - Apenas para quem tem permissão */}
-                {canAccessProfessionalAgenda() && (
-                  <Link to="/agenda-profissional">
-                    <Button variant="ghost" size="sm">
-                      Agenda Profissional
-                    </Button>
-                  </Link>
-                )}
-                
-                {/* Botão do Salão/Estúdio */}
-                {!salonLoading && (
-                  userSalon ? (
-                    <Link to={`/salon/${userSalon.id}`}>
-                      <Button variant="ghost" size="sm">
-                        Meu Salão
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => navigate('/criar-salao')}
-                    >
-                      Criar Salão
-                    </Button>
-                  )
-                )}
-                
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-muted-foreground">
-                    Olá, {user?.name || user?.nickname || 'Usuário'}
-                  </span>
-                  <Link to="/perfil">
-                    <Button variant="ghost" size="icon">
-                      <User className="h-5 w-5" />
-                    </Button>
-                  </Link>
-                  <Button variant="ghost" size="icon" onClick={handleSignOut}>
-                    <LogOut className="h-5 w-5" />
-                  </Button>
-                </div>
               </>
             ) : (
               <>
-                <Link to="/membros">
-                  <Button variant="ghost" size="sm">
-                    Explorar
-                  </Button>
-                </Link>
-                <Link to="/planos">
-                  <Button variant="ghost" size="sm">
-                    Planos
-                  </Button>
-                </Link>
                 <Link to="/login">
                   <Button variant="outline" size="sm">
                     Login
@@ -179,10 +193,8 @@ export function Header() {
                 </Link>
               </>
             )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
+            
+            {/* Menu Hambúrguer - Visível em todas as telas */}
             <Button
               variant="ghost"
               size="icon"
@@ -193,70 +205,85 @@ export function Header() {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Menu Hambúrguer - Funciona em todas as telas */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 space-y-3 border-t border-primary/10">
+          <div className="py-4 space-y-3 border-t border-primary/10">
             {isLoggedIn ? (
               <>
-                <Link to="/perfil" className="block px-4 py-2 text-sm hover:bg-accent">Perfil</Link>
-                
-                {/* Botão do Salão/Estúdio - Mobile */}
+                {/* Seção Principal */}
+                <div className="px-4 py-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Navegação</h3>
+                  <div className="space-y-1">
+                    <Link to="/agenda-pessoal" className="block px-2 py-2 text-sm hover:bg-accent rounded">Agenda Pessoal</Link>
+                    {canAccessProfessionalAgenda() && (
+                      <Link to="/agenda-profissional" className="block px-2 py-2 text-sm hover:bg-accent rounded">Agenda Profissional</Link>
+                    )}
+                    <Link to="/membros" className="block px-2 py-2 text-sm hover:bg-accent rounded">Membros</Link>
+                    <Link to="/beautywall" className="block px-2 py-2 text-sm hover:bg-accent rounded">BeautyWall</Link>
+                  </div>
+                </div>
+
+                {/* Seção do Salão */}
                 {!salonLoading && (
-                  userSalon ? (
-                    <Link to={`/salon/${userSalon.id}`} className="block px-4 py-2 text-sm hover:bg-accent">
-                      Meu Salão
-                    </Link>
-                  ) : (
+                  <div className="px-4 py-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Meu Negócio</h3>
+                    <div className="space-y-1">
+                      {userSalon?.owner_id === user?.id ? (
+                        <Link to={`/salon/${userSalon.id}`} className="block px-2 py-2 text-sm hover:bg-accent rounded">
+                          Meu Salão
+                        </Link>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            navigate('/criar-salao')
+                            setIsMenuOpen(false)
+                          }}
+                          className="block w-full text-left px-2 py-2 text-sm hover:bg-accent rounded"
+                        >
+                          Criar Salão
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Seção de Conta */}
+                <div className="px-4 py-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2">Conta</h3>
+                  <div className="space-y-1">
+                    <Link to="/perfil" className="block px-2 py-2 text-sm hover:bg-accent rounded">Perfil</Link>
+                    <Link to="/planos" className="block px-2 py-2 text-sm hover:bg-accent rounded">Planos</Link>
                     <button 
-                      onClick={() => {
-                        navigate('/criar-salao')
-                        setIsMenuOpen(false)
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-accent"
+                      onClick={handleSignOut}
+                      className="block w-full text-left px-2 py-2 text-sm hover:bg-accent rounded text-destructive"
                     >
-                      Criar Salão
+                      Sair
                     </button>
-                  )
-                )}
-                
-                <Link to="/agenda-pessoal" className="block px-4 py-2 text-sm hover:bg-accent">Agenda Pessoal</Link>
-                <Link to="/membros" className="block px-4 py-2 text-sm hover:bg-accent">Membros</Link>
-                <Link to="/beautywall" className="block px-4 py-2 text-sm hover:bg-accent">BeautyWall</Link>
-                <Link to="/planos" className="block px-4 py-2 text-sm hover:bg-accent">Planos</Link>
-                {/* Agenda Profissional - Apenas para quem tem permissão */}
-                {canAccessProfessionalAgenda() && (
-                  <Link to="/agenda-profissional" className="block px-4 py-2 text-sm hover:bg-accent">Agenda Profissional</Link>
-                )}
-                <button className="block w-full text-left px-4 py-2 text-sm hover:bg-accent">Configurações</button>
-                <button 
-                  onClick={handleSignOut}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-accent text-destructive"
-                >
-                  Sair
-                </button>
+                  </div>
+                </div>
               </>
             ) : (
               <>
-                <Link to="/membros" className="block">
-                  <Button variant="ghost" className="w-full justify-start">
-                    Explorar
-                  </Button>
-                </Link>
-                <Link to="/planos" className="block">
-                  <Button variant="ghost" className="w-full justify-start">
-                    Planos
-                  </Button>
-                </Link>
-                <Link to="/login" className="block">
-                  <Button variant="outline" className="w-full">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/cadastro" className="block">
-                  <Button variant="hero" className="w-full">
-                    Cadastrar
-                  </Button>
-                </Link>
+                <div className="px-4 py-2">
+                  <div className="space-y-1">
+                    <Link to="/membros" className="block px-2 py-2 text-sm hover:bg-accent rounded">Explorar</Link>
+                    <Link to="/planos" className="block px-2 py-2 text-sm hover:bg-accent rounded">Planos</Link>
+                  </div>
+                </div>
+                <div className="px-4 py-2 border-t border-primary/10 pt-4">
+                  <div className="space-y-2">
+                    <Link to="/login" className="block">
+                      <Button variant="outline" className="w-full">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link to="/cadastro" className="block">
+                      <Button variant="hero" className="w-full">
+                        Cadastrar
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </>
             )}
           </div>

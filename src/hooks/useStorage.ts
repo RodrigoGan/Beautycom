@@ -103,14 +103,26 @@ export function useStorage() {
       let compressedFile = file
       switch (bucket) {
         case 'fotoperfil':
-          compressedFile = await compressImage(file, 400, 0.8) // Foto pequena
+          compressedFile = await compressImage(file, { 
+            maxWidth: 400, 
+            maxHeight: 400, 
+            quality: 0.8 
+          }) // Foto pequena quadrada
           break
         case 'fotopost':
-          compressedFile = await compressImage(file, 1200, 0.7) // Foto média
+          compressedFile = await compressImage(file, { 
+            maxWidth: 1200, 
+            maxHeight: 1200, 
+            quality: 0.7 
+          }) // Foto média
           break
         case 'fotodecapa':
         case 'logotipo':
-          compressedFile = await compressImage(file, 800, 0.9) // Alta qualidade
+          compressedFile = await compressImage(file, { 
+            maxWidth: 800, 
+            maxHeight: 800, 
+            quality: 0.9 
+          }) // Alta qualidade
           break
       }
 

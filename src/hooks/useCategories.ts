@@ -11,73 +11,58 @@ export interface Category {
   level: number
   is_active: boolean
   sort_order: number
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 export const useCategories = () => {
   const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchCategories = async () => {
-    setLoading(true)
-    setError(null)
-    
+  // Carregar categorias
+  const loadCategories = useCallback(async () => {
     try {
+      setLoading(true)
+      setError(null)
+
       const { data, error: fetchError } = await supabase
         .from('categories')
         .select('*')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
 
-      if (fetchError) {
-        console.error('❌ Erro ao buscar categorias:', fetchError.message)
-        setError(fetchError.message)
-        return
-      }
+      if (fetchError) throw fetchError
 
       setCategories(data || [])
     } catch (err) {
-      console.error('❌ Erro geral ao buscar categorias:', err)
-      setError('Erro ao buscar categorias')
+      console.error('Erro ao carregar categorias:', err)
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // Função para mapear UUIDs para nomes de categorias
-  const getCategoryNames = useCallback((categoryIds: string[]): string[] => {
+  // Carregar categorias quando o hook for inicializado
+  useEffect(() => {
+    loadCategories()
+  }, [loadCategories])
+
+  // Função para obter nomes das categorias por IDs
+  const getCategoryNames = useCallback((categoryIds: string[]) => {
     if (!categoryIds || categoryIds.length === 0) return []
     
     return categoryIds
-      .map(id => {
-        const category = categories.find(cat => cat.id === id)
-        return category?.name || id
-      })
-      .filter(name => name !== '')
+      .map(id => categories.find(cat => cat.id === id)?.name)
+      .filter(name => name) // Remove undefined values
   }, [categories])
-
-  // Função para buscar categoria por ID
-  const getCategoryById = (id: string): Category | undefined => {
-    return categories.find(cat => cat.id === id)
-  }
-
-  // Função para buscar categorias por IDs
-  const getCategoriesByIds = (ids: string[]): Category[] => {
-    return categories.filter(cat => ids.includes(cat.id))
-  }
-
-  useEffect(() => {
-    fetchCategories()
-  }, []) // Dependências vazias - executar apenas uma vez
 
   return {
     categories,
     loading,
     error,
-    fetchCategories,
-    getCategoryNames,
-    getCategoryById,
-    getCategoriesByIds
+    reload: loadCategories,
+    getCategoryNames
   }
 } 

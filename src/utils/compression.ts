@@ -42,6 +42,24 @@ export const compressImage = async (
     forceFormat = false
   } = options
 
+  // Para arquivos muito grandes, ser mais agressivo na compressão
+  const fileSizeMB = file.size / (1024 * 1024)
+  let adjustedQuality = quality
+  let adjustedMaxWidth = maxWidth
+  let adjustedMaxHeight = maxHeight
+
+  if (fileSizeMB > 10) {
+    // Arquivo muito grande - compressão mais agressiva
+    adjustedQuality = Math.max(0.5, quality - 0.2)
+    adjustedMaxWidth = Math.min(maxWidth, 1000)
+    adjustedMaxHeight = Math.min(maxHeight, 1000)
+  } else if (fileSizeMB > 5) {
+    // Arquivo grande - compressão moderada
+    adjustedQuality = Math.max(0.6, quality - 0.1)
+    adjustedMaxWidth = Math.min(maxWidth, 1200)
+    adjustedMaxHeight = Math.min(maxHeight, 1200)
+  }
+
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -51,8 +69,8 @@ export const compressImage = async (
       try {
         // Calcular novas dimensões mantendo proporção
         const ratio = Math.min(
-          maxWidth / img.width,
-          maxHeight / img.height,
+          adjustedMaxWidth / img.width,
+          adjustedMaxHeight / img.height,
           1 // Não aumentar a imagem
         )
         
@@ -79,7 +97,7 @@ export const compressImage = async (
           outputMimeType = 'image/png'
         }
 
-        // Converter para blob
+        // Converter para blob com qualidade ajustada
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -100,7 +118,7 @@ export const compressImage = async (
             }
           },
           outputMimeType,
-          quality
+          adjustedQuality
         )
       } catch (error) {
         reject(error)
@@ -284,10 +302,10 @@ export const COMPRESSION_CONFIGS = {
     maxSizeMB: 2
   },
   post: {
-    maxWidth: isMobile() ? 800 : 1200,
-    maxHeight: isMobile() ? 800 : 1200,
-    quality: isMobile() ? 0.6 : 0.7,
-    maxSizeMB: 5
+    maxWidth: isMobile() ? 1200 : 1600,
+    maxHeight: isMobile() ? 1200 : 1600,
+    quality: isMobile() ? 0.7 : 0.8,
+    maxSizeMB: 15 // Aumentado de 5MB para 15MB
   },
   cover: {
     maxWidth: 800,
@@ -300,6 +318,12 @@ export const COMPRESSION_CONFIGS = {
     maxHeight: 800,
     quality: 0.9,
     maxSizeMB: 1
+  },
+  service: {
+    maxWidth: 800,
+    maxHeight: 800,
+    quality: 0.8,
+    maxSizeMB: 3
   },
   
   // Vídeos

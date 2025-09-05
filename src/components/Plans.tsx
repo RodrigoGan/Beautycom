@@ -38,7 +38,7 @@ const plans = [
   },
   {
     name: "BeautyTime Plus",
-    price: "R$ 69,90",
+    price: "R$ 89,90",
     icon: Crown,
     description: "Para salões e estúdios maiores",
     badge: "Recomendado",
@@ -53,7 +53,7 @@ const plans = [
   },
   {
     name: "BeautyTime Ad",
-    price: "R$ 9,90",
+    price: "R$ 29,90",
     icon: Zap,
     description: "Adicione mais profissionais",
     badge: "Complementar",

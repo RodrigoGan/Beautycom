@@ -66,7 +66,6 @@ export const PostModal = ({ post, isOpen, onClose, onPostDeleted }: PostModalPro
   
   // Efeito para fazer scroll quando comentários são exibidos
   useEffect(() => {
-    loopDetection.detectUseEffect([showComments])
     if (showComments && commentsRef.current) {
       setTimeout(() => {
         commentsRef.current?.scrollIntoView({ 
@@ -75,7 +74,7 @@ export const PostModal = ({ post, isOpen, onClose, onPostDeleted }: PostModalPro
         })
       }, 100) // Pequeno delay para garantir que o conteúdo foi renderizado
     }
-  }, [showComments, loopDetection])
+  }, [showComments]) // Removida dependência loopDetection
 
   const handleImageClick = (url: string, label: string, type: 'before' | 'after', beforeUrl?: string, afterUrl?: string) => {
     setSelectedImage({ url, label, type })

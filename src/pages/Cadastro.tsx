@@ -49,6 +49,7 @@ const Cadastro = () => {
   const [userId, setUserId] = useState<string | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const { toast } = useToast()
   const { uploadProfilePhoto } = useStorage()
@@ -189,6 +190,7 @@ const Cadastro = () => {
           phone: phoneNumber,
           user_type: userType,
           profile_photo: profilePhotoUrl,
+          agenda_enabled: false, // ✅ Agenda inicia desabilitada
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -197,12 +199,56 @@ const Cadastro = () => {
         throw new Error(profileError.message)
       }
 
-      // 4. Salvar ID do usuário para uso nas próximas etapas
+      // 4. Se for profissional, criar trial de 30 dias
+      if (userType === 'profissional') {
+        console.log('🎁 Criando trial de 30 dias para profissional:', userId)
+        console.log('🎁 Dados do trial:', {
+          professional_id: userId,
+          start_date: new Date().toISOString(),
+          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'active'
+        })
+        
+        const trialEndDate = new Date()
+        trialEndDate.setDate(trialEndDate.getDate() + 30) // 30 dias a partir de hoje
+        
+        const trialData = {
+          professional_id: userId,
+          start_date: new Date().toISOString(),
+          end_date: trialEndDate.toISOString(),
+          status: 'active',
+          created_at: new Date().toISOString()
+        }
+        
+        console.log('🎁 Tentando inserir trial com dados:', trialData)
+        
+        const { data: trialResult, error: trialError } = await supabase
+          .from('professional_trials')
+          .insert(trialData)
+          .select()
+
+        if (trialError) {
+          console.error('❌ Erro ao criar trial:', trialError)
+          console.error('❌ Detalhes do erro:', {
+            message: trialError.message,
+            details: trialError.details,
+            hint: trialError.hint,
+            code: trialError.code
+          })
+          // Não falhar o cadastro se o trial não for criado
+        } else {
+          console.log('✅ Trial de 30 dias criado com sucesso:', trialResult)
+        }
+      }
+
+      // 5. Salvar ID do usuário para uso nas próximas etapas
       setUserId(userId)
 
       toast({
         title: "Cadastro iniciado com sucesso!",
-        description: "Seus dados básicos foram salvos. Continue para completar seu perfil.",
+        description: userType === 'profissional' 
+          ? "Seus dados básicos foram salvos. Você ganhou 30 dias grátis para testar a agenda online! Continue para completar seu perfil."
+          : "Seus dados básicos foram salvos. Continue para completar seu perfil.",
         variant: "default"
       })
 
@@ -468,10 +514,8 @@ const Cadastro = () => {
   // Função para abrir câmera
   const handleCameraClick = () => {
     setShowPhotoMenu(false)
-    if (fileInputRef.current) {
-      fileInputRef.current.accept = "image/*"
-      fileInputRef.current.capture = "environment"
-      fileInputRef.current.click()
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click()
     }
   }
 
@@ -479,8 +523,6 @@ const Cadastro = () => {
   const handleGalleryClick = () => {
     setShowPhotoMenu(false)
     if (fileInputRef.current) {
-      fileInputRef.current.accept = "image/*"
-      fileInputRef.current.capture = undefined
       fileInputRef.current.click()
     }
   }
@@ -723,6 +765,14 @@ const Cadastro = () => {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
                   onChange={handleFileUpload}
                   className="hidden"
                 />

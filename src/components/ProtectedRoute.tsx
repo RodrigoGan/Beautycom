@@ -30,11 +30,11 @@ export function ProtectedRoute({ children, requiredUserType }: ProtectedRoutePro
     // Redirecionar baseado no papel do usuário
     switch (user.user_type) {
       case 'profissional':
-        return <Navigate to="/agenda-profissional" replace />
+        return <Navigate to="/beautywall" replace />
       case 'usuario':
-        return <Navigate to="/agenda-pessoal" replace />
+        return <Navigate to="/beautywall" replace />
       default:
-        return <Navigate to="/agenda-pessoal" replace />
+        return <Navigate to="/beautywall" replace />
     }
   }
 

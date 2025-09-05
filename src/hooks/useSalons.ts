@@ -83,15 +83,46 @@ export const useSalons = (userId?: string) => {
     try {
       console.log('🔍 Buscando salão do usuário:', userId)
       
-      // Buscar salão do usuário com dados do proprietário
-      const { data, error } = await supabase
+      // Primeiro, tentar buscar salão onde o usuário é dono
+      let { data, error } = await supabase
         .from('salons_studios')
         .select(`
           *,
-          owner:users(id, name, email, profile_photo, user_type)
+          owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
         `)
         .eq('owner_id', userId)
         .single()
+
+      // Se não for dono, buscar salão onde é profissional vinculado
+      if (error && error.code === 'PGRST116') {
+        console.log('🔍 Usuário não é dono, buscando como profissional vinculado...')
+        
+        const { data: professionalData, error: professionalError } = await supabase
+          .from('salon_professionals')
+          .select(`
+            salon_id,
+            status,
+            salon:salons_studios!salon_professionals_salon_id_fkey(
+              *,
+              owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
+            )
+          `)
+          .eq('professional_id', userId)
+          .eq('status', 'accepted')
+          .single()
+
+        if (professionalError) {
+          console.log('📭 Usuário não é profissional vinculado:', userId)
+          setUserSalon(null)
+          return
+        }
+
+        if (professionalData?.salon) {
+          console.log('✅ Salão encontrado como profissional vinculado:', professionalData.salon)
+          setUserSalon(professionalData.salon)
+          return
+        }
+      }
 
       if (error) {
         console.error('❌ Erro detalhado do Supabase:', {
@@ -109,7 +140,7 @@ export const useSalons = (userId?: string) => {
           throw error
         }
       } else {
-        console.log('✅ Salão encontrado:', data)
+        // console.log('✅ Salão encontrado como dono:', data)
         setUserSalon(data)
       }
     } catch (err) {
@@ -269,9 +300,10 @@ export const useSalons = (userId?: string) => {
 
   // Carregar dados iniciais
   useEffect(() => {
-    console.log('🔄 useEffect executado - userId:', userId)
-    fetchUserSalon()
-  }, [userId]) // Removida a dependência fetchUserSalon que causa loop
+    if (userId) {
+      fetchUserSalon()
+    }
+  }, [userId, fetchUserSalon])
 
   return {
     userSalon,

@@ -1,17 +1,19 @@
+
+import React from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { QrCode, Share2, Edit3, Heart, Users, UserPlus, MessageSquare, MapPin, Phone, Mail, Instagram, Facebook, Youtube, Linkedin, Sparkles, Star, Bookmark, ArrowLeftRight, Building2, ArrowLeft, Camera, ImageIcon, UserCheck, ChevronLeft, ChevronRight } from "lucide-react"
+import { QrCode, Share2, Edit3, Heart, Users, UserPlus, MessageSquare, MapPin, Phone, Mail, Instagram, Facebook, Youtube, Linkedin, Sparkles, Star, Bookmark, ArrowLeftRight, Building2, ArrowLeft, Camera, ImageIcon, UserCheck, ChevronLeft, ChevronRight, Settings, BarChart3 } from "lucide-react"
 import { useAuthContext } from "@/contexts/AuthContext"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, Link } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Header } from "@/components/Header"
 import { useToast } from "@/hooks/use-toast"
 import { useSalons } from "@/hooks/useSalons"
 import { useSalonStats } from "@/hooks/useSalonStats"
-import { useSalonPermissions } from "@/hooks/useSalonPermissions"
+// import { useSalonPermissions } from "@/hooks/useSalonPermissions" // REMOVIDO TEMPORARIAMENTE
 import { useSalonMainPosts } from "@/hooks/useSalonMainPosts"
 import { SalonMainPostButton } from "@/components/SalonMainPostButton"
 import { SalonPostsFilter } from "@/components/SalonPostsFilter"
@@ -25,9 +27,10 @@ import { SalonFollowModal } from '@/components/SalonFollowModal'
 import { SalonClientsModal } from '@/components/SalonClientsModal'
 import { SalonPostsModal } from '@/components/SalonPostsModal'
 import { QRCodeModal } from '@/components/QRCodeModal'
-import { SalonEmployeeManager } from '@/components/SalonEmployeeManager'
+// import { SalonEmployeeManager } from '@/components/SalonEmployeeManager' // REMOVIDO TEMPORARIAMENTE
 import { SalonProfessionalManager } from '@/components/SalonProfessionalManager'
 import { SalonSkills } from '@/components/SalonSkills'
+import { SubscriptionSummaryCard } from '@/components/SubscriptionSummaryCard'
 
 const SalonProfile = () => {
   const { user } = useAuthContext()
@@ -65,7 +68,42 @@ const SalonProfile = () => {
     categories: [] as string[]
   })
 
+  // Estado para profissionais do salão
+  const [professionals, setProfessionals] = useState<any[]>([])
 
+  // Função para buscar profissionais do salão
+  const fetchSalonProfessionals = async () => {
+    if (!salon?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('salon_professionals')
+        .select(`
+          id,
+          professional_id,
+          status,
+          professional:users!salon_professionals_professional_id_fkey(
+            id,
+            name,
+            email,
+            profile_photo,
+            user_type,
+            agenda_enabled
+          )
+        `)
+        .eq('salon_id', salon.id)
+        .eq('status', 'accepted')
+
+      if (error) {
+        console.error('Erro ao buscar profissionais:', error)
+        return
+      }
+
+      setProfessionals(data || [])
+    } catch (error) {
+      console.error('Erro ao buscar profissionais:', error)
+    }
+  }
 
   // Estados para modais de métricas
   const [showFollowModal, setShowFollowModal] = useState(false)
@@ -79,8 +117,17 @@ const SalonProfile = () => {
   // Buscar estatísticas do salão
   const { stats: salonStats, loading: statsLoading, error: statsError } = useSalonStats(salon?.id || '')
 
-  // Buscar permissões do usuário no salão
-  const { hasPermission, isOwner, isEmployee } = useSalonPermissions(salon?.id || '')
+  // Buscar permissões do usuário no salão - REMOVIDO TEMPORARIAMENTE
+  // const { hasPermission, isOwner, isEmployee } = useSalonPermissions(salon?.id || '')
+  
+  // Simplificação temporária - apenas verificar se é dono
+  const isOwner = user?.id === salon?.owner_id
+  const hasPermission = (permission: string) => {
+    // Para visualização de profissionais, todos podem ver
+    if (permission === 'manage_service_professionals.view') return true
+    // Para outras permissões, apenas o dono
+    return isOwner
+  }
 
   // Buscar posts principais do salão
   console.log('🏢 SalonProfile - salon?.id:', salon?.id, 'user?.id:', user?.id)
@@ -518,6 +565,11 @@ const SalonProfile = () => {
 
   const totalPages = Math.ceil(totalPosts / postsPerPage)
 
+  // Scroll para o topo quando a página carregar
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
   // Carregar dados do salão
   useEffect(() => {
     const loadSalon = async () => {
@@ -558,6 +610,13 @@ const SalonProfile = () => {
       fetchSalonPosts(currentPage)
     }
   }, [salon?.id, currentPage])
+
+  // Carregar profissionais quando o salão for carregado
+  useEffect(() => {
+    if (salon?.id) {
+      fetchSalonProfessionals()
+    }
+  }, [salon?.id])
 
   // Aplicar filtros quando posts ou filtros mudarem
   useEffect(() => {
@@ -1008,6 +1067,53 @@ const SalonProfile = () => {
             </CardContent>
           </Card>
 
+          {/* Área Administrativa - Apenas para proprietários */}
+          {isOwner && (
+            <Card className="mb-6 bg-gradient-card border-primary/20 shadow-beauty-card hover:shadow-beauty transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Área Administrativa
+                </CardTitle>
+                <CardDescription>
+                  Gerencie seu salão e configurações
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap justify-center gap-4">
+                  <Button variant="hero" className="h-auto p-4 flex-col min-w-[180px]" asChild>
+                    <Link to="/area-administrativa">
+                      <Settings className="h-6 w-6 mb-2" />
+                      <span className="text-sm">Acessar Área Administrativa</span>
+                    </Link>
+                  </Button>
+                  
+                  {hasPermission('reports.view') && (
+                    <Button variant="outline" className="h-auto p-4 flex-col min-w-[180px]" asChild>
+                      <Link to="/relatorios-agenda">
+                        <BarChart3 className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Ver Relatórios</span>
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Resumo da Assinatura - Apenas para proprietários */}
+          {isOwner && (
+            <SubscriptionSummaryCard
+              userId={user?.id}
+              professionalsCount={salonStats.professionals}
+              activeProfessionalsCount={professionals.filter(prof => prof.professional?.agenda_enabled).length}
+              onSubscriptionChange={() => {
+                // Recarregar dados após mudança na assinatura
+                window.location.reload()
+              }}
+            />
+          )}
+
           {/* Descrição */}
           <Card className="mb-6 bg-gradient-card border-accent/20 shadow-beauty-card hover:shadow-beauty transition-all duration-300">
             <CardHeader>
@@ -1027,23 +1133,21 @@ const SalonProfile = () => {
             </CardContent>
           </Card>
 
-          {/* Meus Funcionários - Apenas para quem tem permissão */}
-          {hasPermission('manage_employees.view') && (
+          {/* Meus Funcionários - REMOVIDO TEMPORARIAMENTE */}
+          {/* {hasPermission('manage_employees.view') && (
             <SalonEmployeeManager salonId={salon?.id || ''} />
-          )}
+          )} */}
 
-          {/* Meus Profissionais - Conforme permissões */}
-          {hasPermission('manage_service_professionals.view') && (
-            <SalonProfessionalManager 
-              salonId={salon.id}
-              forcePermissions={{
-                canView: hasPermission('manage_service_professionals.view'),
-                canAdd: hasPermission('manage_service_professionals.add'),
-                canRemove: hasPermission('manage_service_professionals.remove'),
-                isOwner: isOwner()
-              }}
-            />
-          )}
+          {/* Meus Profissionais - Todos podem ver, mas com funcionalidades restritas */}
+          <SalonProfessionalManager 
+            salonId={salon.id}
+            forcePermissions={{
+              canView: true, // Todos podem ver
+              canAdd: isOwner, // Apenas dono pode adicionar
+              canRemove: isOwner, // Apenas dono pode remover
+              isOwner: isOwner
+            }}
+          />
           
 
 
@@ -1373,14 +1477,13 @@ const SalonProfile = () => {
                         )}
                       </div>
 
-                      {/* Botão de Post Principal (para proprietário e funcionários com permissão) */}
+                      {/* Botão de Post Principal (apenas para proprietário) */}
                       {(() => {
-                        const canManageMainPosts = isOwnSalon || isOwner() || isEmployee
+                        const canManageMainPosts = isOwnSalon || isOwner
                         console.log('🔍 Verificando permissões para posts principais:', {
                           postId: post.id,
                           isOwnSalon,
-                          isOwner: isOwner(),
-                          isEmployee,
+                          isOwner,
                           canManageMainPosts,
                           currentUserId: user?.id,
                           salonOwnerId: salon?.owner_id

@@ -12,12 +12,13 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
-  MapPin
+  MapPin,
+  Calendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useSalonPermissions } from '@/hooks/useSalonPermissions'
 import { useToast } from '@/hooks/use-toast'
 import { AddProfessionalModal } from './AddProfessionalModal'
+import { ScheduleModal } from './ScheduleModal'
 import {
   Dialog,
   DialogContent,
@@ -57,28 +58,23 @@ interface SalonProfessionalManagerProps {
 
 export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> = ({ salonId, forcePermissions }) => {
   
-  const { hasPermission, isOwner, isEmployee } = useSalonPermissions(salonId)
   const { toast } = useToast()
-  
-
   
   const [professionals, setProfessionals] = useState<SalonProfessional[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-
-  
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [selectedProfessional, setSelectedProfessional] = useState<SalonProfessional | null>(null)
   const [removingProfessional, setRemovingProfessional] = useState<string | null>(null)
 
-  // Verificar permissões - usar forcePermissions se disponível
-  const canViewProfessionals = forcePermissions?.canView ?? hasPermission('manage_service_professionals.view')
-  const canAddProfessionals = forcePermissions?.canAdd ?? hasPermission('manage_service_professionals.add')
-  const canRemoveProfessionals = forcePermissions?.canRemove ?? hasPermission('manage_service_professionals.remove')
-  const isOwnerUser = forcePermissions?.isOwner ?? isOwner()
+  // Verificar permissões - usar forcePermissions
+  const canViewProfessionals = forcePermissions?.canView ?? true
+  const canAddProfessionals = forcePermissions?.canAdd ?? false
+  const canRemoveProfessionals = forcePermissions?.canRemove ?? false
+  const isOwnerUser = forcePermissions?.isOwner ?? false
   
 
 
@@ -92,9 +88,10 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
         .from('salon_professionals')
         .select(`
           *,
-          professional:users(id, name, nickname, profile_photo, email, cidade, uf)
+          professional:users!salon_professionals_professional_id_fkey(id, name, nickname, profile_photo, email, cidade, uf)
         `)
         .eq('salon_id', salonId)
+        .eq('status', 'accepted')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -138,14 +135,17 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
 
   // Buscar profissionais quando componente montar
   useEffect(() => {
-    if (isOwnerUser || canViewProfessionals) {
-      fetchProfessionals()
-    }
-  }, [salonId, isOwnerUser, canViewProfessionals])
+    fetchProfessionals()
+  }, [salonId])
 
   const handleDeleteClick = (professional: SalonProfessional) => {
     setSelectedProfessional(professional)
     setShowDeleteModal(true)
+  }
+
+  const handleScheduleClick = (professional: SalonProfessional) => {
+    setSelectedProfessional(professional)
+    setShowScheduleModal(true)
   }
 
   const handleConfirmDelete = async () => {
@@ -240,13 +240,8 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
     }
   }
 
-  // LÓGICA CORRIGIDA: Proprietário sempre pode ver, funcionário precisa de permissão
-  const canAccess = isOwnerUser || canViewProfessionals
-  
-  // Se não tem acesso, não renderiza nada
-  if (!canAccess) {
-    return null
-  }
+  // LÓGICA SIMPLIFICADA: Todos podem ver o card, mas com funcionalidades restritas
+  // O card sempre aparece, mas os botões de ação dependem das permissões
 
   return (
     <>
@@ -329,7 +324,7 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      @{professional.professional?.nickname}
+                      {professional.professional?.email}
                     </p>
                     {professional.professional?.cidade && professional.professional?.uf && (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -341,7 +336,19 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
 
                   {/* Ações */}
                   <div className="flex items-center gap-1">
-                                            {(isOwnerUser || canRemoveProfessionals) && (
+                    {/* Botão de Agendamento - Sempre visível */}
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                      onClick={() => handleScheduleClick(professional)}
+                      title="Agendar horário"
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </Button>
+                    
+                    {/* Botão de Lixeira - Apenas para proprietário */}
+                    {(isOwnerUser || canRemoveProfessionals) && (
                       <Button 
                         variant="ghost" 
                         size="sm"
@@ -371,6 +378,20 @@ export const SalonProfessionalManager: React.FC<SalonProfessionalManagerProps> =
          salonId={salonId}
          onProfessionalAdded={fetchProfessionals}
        />
+
+       {/* Modal de agendamento */}
+       {selectedProfessional && (
+         <ScheduleModal
+           isOpen={showScheduleModal}
+           onClose={() => setShowScheduleModal(false)}
+           professional={{
+             id: selectedProfessional.professional_id,
+             name: selectedProfessional.professional?.name || 'Profissional',
+             profile_photo: selectedProfessional.professional?.profile_photo,
+             salon_id: salonId
+           }}
+         />
+       )}
 
        {/* Modal de confirmação para excluir profissional */}
        <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>

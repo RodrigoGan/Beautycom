@@ -3,16 +3,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Calendar, Clock, User, Users, BarChart3, Plus, Settings, AlertCircle, ArrowLeft, Edit3, UserCheck, UserX } from "lucide-react"
+import { Calendar, Clock, User, Users, BarChart3, Plus, Settings, AlertCircle, ArrowLeft, Edit3, UserCheck, UserX, ExternalLink } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useSalons } from "@/hooks/useSalons"
-import { useSalonPermissions, type EmployeePermissions } from "@/hooks/useSalonPermissions"
+import { useSalonPermissions, type EmployeePermissions, type SalonEmployee } from "@/hooks/useSalonPermissions"
 import { useAppointments } from "@/hooks/useAppointments"
 import { useSalonProfessionals } from "@/hooks/useSalonProfessionals"
 import { useSalonEmployees } from "@/hooks/useSalonEmployees"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { PERMISSION_CATEGORIES } from "@/config/permissionCategories"
+import { SubscriptionSummaryCard } from "@/components/SubscriptionSummaryCard"
 
 const AgendaProfissional = () => {
   const { user } = useAuthContext()
@@ -93,6 +94,18 @@ const AgendaProfissional = () => {
     return false
   }
 
+  // Função para recarregar agendamentos considerando o tipo de usuário
+  const reloadAppointments = useCallback(async () => {
+    if (!userSalon?.id) return
+    
+    // Se for proprietário, carrega todos os agendamentos do salão
+    // Se for profissional vinculado, carrega apenas seus agendamentos
+    const isOwner = userSalon.owner_id === user?.id
+    const professionalId = isOwner ? undefined : user?.id
+    
+    await fetchSalonAppointments(userSalon.id, undefined, professionalId)
+  }, [userSalon?.id, user?.id, fetchSalonAppointments])
+
   // Carregar agendamentos, profissionais e funcionários do salão
   useEffect(() => {
 
@@ -100,6 +113,11 @@ const AgendaProfissional = () => {
     // Sistema de segurança ULTRA RÍGIDO contra loops
     if (!userSalon?.id || userSalon.id.trim() === '') {
       console.log('❌ ID do salão inválido')
+      // Se for profissional independente, não precisa de salão
+      if (user?.user_type === 'profissional' && !userSalon?.id) {
+        console.log('✅ Profissional independente, não precisa de salão')
+        return
+      }
       return
     }
     
@@ -125,7 +143,7 @@ const AgendaProfissional = () => {
     
     // Executar carregamentos em paralelo
     Promise.all([
-      fetchSalonAppointments(userSalon.id),
+      reloadAppointments(),
       fetchProfessionals(),
       fetchEmployees()
     ]).finally(() => {
@@ -133,19 +151,30 @@ const AgendaProfissional = () => {
       setIsLoadingData(false)
       setHasInitialLoad(true)
     })
-  }, [userSalon?.id]) // Apenas o ID do salão como dependência
+  }, [userSalon?.id, reloadAppointments]) // ID do salão e função de recarregamento
 
   // Funções para controlar agenda dos profissionais
   const handleEnableAgenda = async (professionalId: string) => {
+    console.log('🚀 handleEnableAgenda chamada para:', professionalId)
+    try {
     const result = await enableAgenda(professionalId)
+      console.log('🚀 Resultado do enableAgenda:', result)
     if (result.success) {
       // Toast de sucesso seria mostrado aqui
       console.log('✅ Agenda habilitada com sucesso')
       // Recarregar dados para garantir sincronização
+      console.log('🔄 Recarregando dados após habilitar agenda...')
       await fetchProfessionals()
+      await reloadAppointments()
+      // Recarregar card de assinatura
+      console.log('🔄 Dados recarregados - página NÃO recarregada para debug')
+      // window.location.reload() // REMOVIDO TEMPORARIAMENTE PARA DEBUG
     } else {
       // Toast de erro seria mostrado aqui
       console.error('❌ Erro ao habilitar agenda:', result.error)
+      }
+    } catch (error) {
+      console.error('❌ Erro na função handleEnableAgenda:', error)
     }
   }
 
@@ -156,6 +185,10 @@ const AgendaProfissional = () => {
       console.log('✅ Agenda desabilitada com sucesso')
       // Recarregar dados para garantir sincronização
       await fetchProfessionals()
+      await reloadAppointments()
+      // Recarregar card de assinatura
+      console.log('🔄 Dados recarregados - página NÃO recarregada para debug')
+      // window.location.reload() // REMOVIDO TEMPORARIAMENTE PARA DEBUG
     } else {
       // Toast de erro seria mostrado aqui
       console.error('❌ Erro ao desabilitar agenda:', result.error)
@@ -168,15 +201,35 @@ const AgendaProfissional = () => {
   }
 
   // Verificar se pode controlar a agenda do profissional
-  const canControlAgenda = (professionalId: string) => {
+  const canControlAgenda = (professionalId: string, professional: any) => {
+    console.log('🔍 canControlAgenda - Debug:', {
+      professionalId,
+      professionalName: professional?.name,
+      isProfessionalOwner: isProfessionalOwner(professionalId),
+      isOwner: isOwner(),
+      hasPermission: hasPermission('employees.edit'),
+      userSalonOwnerId: userSalon?.owner_id,
+      currentUserId: user?.id
+    })
+    
     // Se for o próprio dono do salão, ele pode controlar sua própria agenda
     if (isProfessionalOwner(professionalId)) {
       // Só o próprio dono pode controlar sua agenda
-      return user?.id === professionalId
+      const canControl = user?.id === professionalId
+      console.log('🔍 É dono do salão, pode controlar:', canControl)
+      return canControl
     }
     
-    // Para outros profissionais, precisa ter permissão de edição de funcionários
-    return hasPermission('employees.edit')
+    // Para outros profissionais sem agenda própria, o dono do salão pode controlar
+    if (isOwner()) {
+      console.log('🔍 É dono do salão, pode controlar outros profissionais')
+      return true
+    }
+    
+    // Para funcionários, precisa ter permissão de edição de funcionários
+    const hasEmpPermission = hasPermission('employees.edit')
+    console.log('🔍 Tem permissão de funcionários:', hasEmpPermission)
+    return hasEmpPermission
   }
 
   // Funções para gerenciar gestores da agenda
@@ -774,136 +827,63 @@ const AgendaProfissional = () => {
         </Card>
 
         {/* Resumo da Assinatura */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              Resumo da Assinatura
-              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">Ativa</Badge>
-            </CardTitle>
-            <CardDescription>
-              Plano Plus - Até 5 profissionais • Renovação em 30 dias
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Mobile: Apenas 3 métricas essenciais */}
-            <div className="grid grid-cols-3 gap-4 sm:hidden">
-              <div className="text-center">
-                <div className="text-lg font-bold text-accent">
-                  {professionalsLoading ? '...' : professionals.length}
-                </div>
-                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                  <Users className="h-3 w-3" />
-                  Ativos
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-green-600">
-                  {professionalsLoading ? '...' : professionals.filter(prof => prof.agenda_enabled).length}
-                </div>
-                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Habilitadas
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-orange-600">
-                  {professionalsLoading ? '...' : Math.max(0, 5 - professionals.length)}
-                </div>
-                <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Vagas
-                </div>
-              </div>
-            </div>
-            
-            {/* Desktop: Todas as 4 métricas */}
-            <div className="hidden sm:grid sm:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  5
-                </div>
-                <div className="text-sm text-muted-foreground">Profissionais Incluídos</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-accent">
-                  {professionalsLoading ? '...' : professionals.length}
-                </div>
-                <div className="text-sm text-muted-foreground">Profissionais Ativos</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {professionalsLoading ? '...' : professionals.filter(prof => prof.agenda_enabled).length}
-                </div>
-                <div className="text-sm text-muted-foreground">Agendas Habilitadas</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {professionalsLoading ? '...' : Math.max(0, 5 - professionals.length)}
-                </div>
-                <div className="text-sm text-muted-foreground">Vagas Disponíveis</div>
-              </div>
-            </div>
-            
-            {/* Barra de progresso - sempre visível */}
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Uso da Assinatura:</span>
-                <span className="font-medium">
-                  {professionalsLoading ? '...' : `${Math.round((professionals.length / 5) * 100)}%`}
-                </span>
-              </div>
-              <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${professionalsLoading ? 0 : Math.min((professionals.length / 5) * 100, 100)}%` }}
-                ></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SubscriptionSummaryCard
+          userId={user?.id}
+          onSubscriptionChange={() => {
+            // Recarregar dados após mudança na assinatura
+            window.location.reload()
+          }}
+        />
 
         {/* Ações Rápidas */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          {hasPermission('appointments.view_all_professionals') && (
-            <Button variant="hero" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
-              <Link to="/agenda-completa">
-                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
-                <span className="hidden sm:inline">Ver Agenda Completa</span>
-                <span className="sm:hidden">Agenda</span>
-              </Link>
-            </Button>
-          )}
-          {hasPermission('appointments.create') && (
-            <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
-              <Link to="/novo-agendamento">
-                <Plus className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
-                <span className="hidden sm:inline">Novo Agendamento</span>
-                <span className="sm:hidden">Novo</span>
-              </Link>
-            </Button>
-          )}
-          {hasPermission('reports.view') && (
-            <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
-              <Link to="/relatorios-agenda">
-                <BarChart3 className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
-                <span className="hidden sm:inline">Relatórios</span>
-                <span className="sm:hidden">Relatórios</span>
-              </Link>
-            </Button>
-          )}
-          {hasPermission('system_settings.edit') && (
-            <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
-              <Link to="/configuracoes-agenda">
-                <Settings className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
-                <span className="hidden sm:inline">Configurações</span>
-                <span className="sm:hidden">Config</span>
-              </Link>
-            </Button>
-          )}
+          {/* Ver Agenda Completa - Para todos os profissionais */}
+          <Button variant="hero" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
+            <Link to="/agenda-completa">
+              <Calendar className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
+              <span className="hidden sm:inline">Ver Agenda Completa</span>
+              <span className="sm:hidden text-center leading-tight">Agenda Completa</span>
+            </Link>
+          </Button>
+            
+          {/* Novo Agendamento - Para todos os profissionais */}
+              <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
+                <Link to="/novo-agendamento">
+            <Plus className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
+            <span className="hidden sm:inline">Novo Agendamento</span>
+            <span className="sm:hidden text-center leading-tight">Novo Agendamento</span>
+                </Link>
+          </Button>
+          
+          {/* Relatórios - Lógica inteligente baseada no tipo de usuário */}
+          <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
+            <Link to={`/relatorios-agenda${userSalon?.owner_id === user?.id ? '' : `?professional=${user?.id}`}`}>
+              <BarChart3 className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
+              <span className="hidden sm:inline">
+                {userSalon?.owner_id === user?.id ? 'Relatórios' : 'Meus Relatórios'}
+              </span>
+              <span className="sm:hidden text-center leading-tight">
+                {userSalon?.owner_id === user?.id ? 'Relatórios' : 'Meus Relatórios'}
+              </span>
+            </Link>
+          </Button>
+          
+          {/* Configurações - Lógica inteligente baseada no tipo de usuário */}
+          <Button variant="outline" className="h-auto p-3 sm:p-4 flex-col text-xs sm:text-sm" asChild>
+            <Link to={`/configuracoes-agenda${userSalon?.owner_id === user?.id ? '' : `?professional=${user?.id}`}`}>
+              <Settings className="h-4 w-4 sm:h-6 sm:w-6 mb-1 sm:mb-2" />
+              <span className="hidden sm:inline">
+                {userSalon?.owner_id === user?.id ? 'Configurações' : 'Minhas Config.'}
+              </span>
+              <span className="sm:hidden text-center leading-tight">
+                {userSalon?.owner_id === user?.id ? 'Configurações' : 'Minhas Configurações'}
+              </span>
+            </Link>
+          </Button>
         </div>
 
         {/* Profissionais da Equipe */}
-        <Card className="mb-6">
+          <Card className="mb-6">
           <CardHeader>
             <CardTitle>Profissionais da Equipe</CardTitle>
           </CardHeader>
@@ -911,8 +891,8 @@ const AgendaProfissional = () => {
             {professionalsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-muted-foreground">Carregando profissionais...</div>
-              </div>
-            ) : (
+                  </div>
+                ) : (
               <div className="space-y-4">
                 {professionals.map((salonProfessional) => {
                   const todayAppointments = appointments.filter(
@@ -921,7 +901,12 @@ const AgendaProfissional = () => {
                   )
                   
                   return (
-                    <div key={salonProfessional.id} className="flex flex-col gap-3 p-3 sm:p-4 rounded-lg bg-gradient-card sm:flex-row sm:items-center sm:justify-between">
+                    <Link 
+                      key={salonProfessional.id} 
+                      to={`/perfil/${salonProfessional.professional_id}`}
+                      className="flex flex-col gap-3 p-3 sm:p-4 rounded-lg bg-gradient-card sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:bg-gradient-card/80 hover:shadow-md transition-all duration-200 group no-underline"
+                      title="Clique para ver o perfil do profissional"
+                    >
                       {/* Header com avatar e nome - full width no mobile */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Avatar className="h-10 w-10 flex-shrink-0">
@@ -929,14 +914,15 @@ const AgendaProfissional = () => {
                           <AvatarFallback>{salonProfessional.professional?.name?.charAt(0) || 'P'}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-base truncate">
+                          <h3 className="font-semibold text-base truncate flex items-center gap-2 group-hover:text-primary transition-colors">
                             {salonProfessional.professional?.name || 'Profissional não informado'}
+                            <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h3>
                           <p className="text-sm text-muted-foreground">
                             {todayAppointments.length} agendamentos hoje
                           </p>
-                        </div>
-                      </div>
+                    </div>
+                  </div>
 
                       {/* Badges - full width no mobile, inline no desktop */}
                       <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-2 sm:items-center">
@@ -945,10 +931,10 @@ const AgendaProfissional = () => {
                         </Badge>
                         {isProfessionalOwner(salonProfessional.professional_id) ? (
                           <Badge 
-                            variant={salonProfessional.agenda_enabled ? "default" : "outline"} 
+                            variant={salonProfessional.professional?.agenda_enabled ? "default" : "outline"} 
                             className="text-xs"
                           >
-                            {salonProfessional.agenda_enabled ? "Agenda Própria Ativa" : "Agenda Própria Inativa"}
+                            {salonProfessional.professional?.agenda_enabled ? "Agenda Própria Ativa" : "Agenda Própria Inativa"}
                           </Badge>
                         ) : (
                           <Badge 
@@ -957,8 +943,8 @@ const AgendaProfissional = () => {
                           >
                             {salonProfessional.agenda_enabled ? "Agenda Ativa" : "Agenda Inativa"}
                           </Badge>
-                        )}
-                      </div>
+                )}
+              </div>
 
                       {/* Informação de habilitação - só mostra quando relevante */}
                       {!isProfessionalOwner(salonProfessional.professional_id) && 
@@ -967,24 +953,25 @@ const AgendaProfissional = () => {
                         <div className="text-xs text-muted-foreground sm:hidden">
                           Habilitada em {new Date(salonProfessional.agenda_enabled_at).toLocaleDateString('pt-BR')}
                           {salonProfessional.enabled_by_user && ` por ${salonProfessional.enabled_by_user.name}`}
-                        </div>
+                </div>
                       )}
 
                       {/* Botões - full width no mobile, compactos no desktop */}
                       <div className="flex flex-col gap-2 w-full sm:flex-row sm:gap-2 sm:w-auto sm:flex-shrink-0">
-                        <Button variant="outline" size="sm" className="text-xs border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto">
-                          Ver Agenda
-                        </Button>
-                        
                         <div className="flex gap-2">
-                          {canControlAgenda(salonProfessional.professional_id) && (
+                          {canControlAgenda(salonProfessional.professional_id, salonProfessional.professional) && (
                             <>
                               {salonProfessional.agenda_enabled ? (
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
                                   className="text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 flex-1 sm:flex-none"
-                                  onClick={() => handleDisableAgenda(salonProfessional.id)}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    console.log('🖱️ Botão Desabilitar Agenda clicado')
+                                    handleDisableAgenda(salonProfessional.professional_id)
+                                  }}
                                 >
                                   Desabilitar Agenda
                                 </Button>
@@ -993,7 +980,12 @@ const AgendaProfissional = () => {
                                   variant="outline" 
                                   size="sm" 
                                   className="text-xs border-green-300 text-green-600 hover:bg-green-50 hover:border-green-400 flex-1 sm:flex-none"
-                                  onClick={() => handleEnableAgenda(salonProfessional.id)}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    console.log('🖱️ Botão Habilitar Agenda clicado')
+                                    handleEnableAgenda(salonProfessional.professional_id)
+                                  }}
                                 >
                                   Habilitar Agenda
                                 </Button>
@@ -1001,9 +993,9 @@ const AgendaProfissional = () => {
                             </>
                           )}
 
-                        </div>
                       </div>
-                    </div>
+                      </div>
+                    </Link>
                   )
                 })}
                 {professionals.length === 0 && (
@@ -1018,10 +1010,10 @@ const AgendaProfissional = () => {
           </CardContent>
         </Card>
 
-        {/* Agendamentos de Hoje */}
+        {/* Próximos Agendamentos de Hoje */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Agendamentos de Hoje</CardTitle>
+            <CardTitle>Próximos Agendamentos de Hoje</CardTitle>
             <CardDescription>{new Date().toLocaleDateString('pt-BR', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -1032,398 +1024,100 @@ const AgendaProfissional = () => {
           <CardContent>
             {appointmentsLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Carregando agendamentos...</div>
-              </div>
-            ) : todayAppointments.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum agendamento para hoje</p>
-                <p className="text-sm text-muted-foreground">Aproveite para organizar sua agenda</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {todayAppointments.map((appointment) => (
-                  <div key={appointment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border gap-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="text-center flex-shrink-0">
-                        <div className="font-semibold text-sm sm:text-base">{appointment.start_time}</div>
-                        <div className="text-xs text-muted-foreground">{appointment.duration_minutes}min</div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-sm sm:text-base truncate">
-                          {appointment.client?.name || 'Cliente não informado'}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                          {appointment.service?.name || 'Serviço não informado'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          com {appointment.professional?.name || 'Profissional não informado'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-                      <Button variant="outline" size="sm" className="text-xs border-gray-300 text-gray-700 hover:bg-gray-50">
-                        Detalhes
-                      </Button>
-
-                    </div>
+                <div className="text-primary/60 font-medium">Carregando agendamentos...</div>
                   </div>
-                ))}
-              </div>
-            )}
-            <Button variant="outline" className="w-full mt-4 border-gray-300 text-gray-700 hover:bg-gray-50" asChild>
-              <Link to="/agenda-completa">Ver todos os agendamentos</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-
-
-        {/* Gestores */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Gestores da Agenda</span>
-              {hasPermission('employees.edit') && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                  onClick={handleAddManager}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Gestor
-                </Button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {employeesLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">Carregando gestores...</div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Proprietário sempre aparece primeiro */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-card border border-yellow-400/50">
-                  <Avatar className="h-10 w-10 flex-shrink-0">
-                    <AvatarImage src={userSalon?.owner?.profile_photo} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-500 text-white">
-                      {userSalon?.owner?.name?.charAt(0).toUpperCase() || 'P'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium truncate text-sm">
-                        {userSalon?.owner?.name || 'Proprietário'}
-                      </p>
-                      <Badge 
-                        variant="default" 
-                        className="text-xs bg-yellow-100 text-yellow-800"
-                      >
-                        Proprietário
-                      </Badge>
-                      <Badge 
-                        variant="default" 
-                        className="text-xs bg-green-100 text-green-800"
-                      >
-                        <UserCheck className="h-3 w-3" />
-                        <span className="ml-1">Ativo</span>
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      @{userSalon?.owner?.email?.split('@')[0] || 'proprietario'}
-                    </p>
-                  </div>
+            ) : (() => {
+              // Filtrar apenas agendamentos futuros de hoje
+              const now = new Date()
+              const currentTime = now.getHours() * 60 + now.getMinutes() // Hora atual em minutos
+              
+              console.log('🔍 Debug Próximos Agendamentos:', {
+                totalTodayAppointments: todayAppointments.length,
+                currentTime: currentTime,
+                currentTimeFormatted: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
+                todayAppointments: todayAppointments.map(apt => ({
+                  id: apt.id,
+                  start_time: apt.start_time,
+                  client_name: apt.client?.name,
+                  professional_name: apt.professional?.name
+                }))
+              })
+              
+              const upcomingTodayAppointments = todayAppointments.filter(appointment => {
+                if (!appointment.start_time) return false
+                
+                const [hours, minutes] = appointment.start_time.split(':').map(Number)
+                const appointmentTime = hours * 60 + minutes // Horário do agendamento em minutos
+                
+                const isFuture = appointmentTime > currentTime
+                console.log('🔍 Agendamento:', {
+                  id: appointment.id,
+                  start_time: appointment.start_time,
+                  appointmentTime,
+                  currentTime,
+                  isFuture
+                })
+                
+                return isFuture // Só retorna se for futuro
+              }).sort((a, b) => {
+                // Ordenar por horário (mais cedo primeiro)
+                if (!a.start_time || !b.start_time) return 0
+                const [aHours, aMinutes] = a.start_time.split(':').map(Number)
+                const [bHours, bMinutes] = b.start_time.split(':').map(Number)
+                return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes)
+              })
+              
+              console.log('✅ Agendamentos futuros de hoje:', upcomingTodayAppointments.length)
+              
+              if (upcomingTodayAppointments.length === 0) {
+                return (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 mx-auto text-primary/60 mb-4" />
+                    <p className="text-muted-foreground font-medium">Nenhum agendamento futuro para hoje</p>
+                    <p className="text-sm text-muted-foreground">Todos os horários já passaram</p>
                 </div>
-
-                {/* Gestores adicionais */}
-                {currentManagers.map((manager) => (
-                  <div 
-                    key={manager.id} 
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors"
-                  >
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                      <AvatarImage src={manager.user?.profile_photo} />
-                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-500 text-white">
-                        {manager.user?.name?.charAt(0).toUpperCase() || 'G'}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium truncate text-sm">
-                          {manager.user?.name || 'Gestor'}
-                        </p>
-                        <Badge 
-                          variant="default" 
-                          className={`text-xs ${getRoleColor(manager.role)}`}
-                        >
-                          {getRoleLabel(manager.role, manager.role_description)}
-                        </Badge>
-                        <Badge 
-                          variant="default" 
-                          className={`text-xs ${getStatusColor(manager.status)}`}
-                          title={manager.status === 'pending' ? 'Aguardando aceitação do convite' : undefined}
-                        >
-                          {getStatusIcon(manager.status)}
-                          <span className="ml-1">{getStatusLabel(manager.status)}</span>
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        @{manager.user?.nickname || 'funcionario'}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {hasPermission('employees.edit') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditManager(manager)}
-                          className="h-8 w-8 p-0"
-                          title="Editar permissões da agenda"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                )
+              }
+              
+              return (
+                <div className="space-y-3">
+                  {upcomingTodayAppointments.map((appointment) => (
+                    <div key={appointment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-gradient-card hover:bg-gradient-card/80 transition-all duration-200 gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="text-center flex-shrink-0">
+                          <div className="font-semibold text-sm sm:text-base">
+                            {appointment.start_time ? appointment.start_time.split(':').slice(0, 2).join(':') : '--:--'}
+            </div>
+                          <div className="text-xs text-muted-foreground">{appointment.duration_minutes}min</div>
                   </div>
-                ))}
-
-                {/* Estado vazio se não há gestores adicionais */}
-                {currentManagers.length === 0 && (
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-dashed">
-                    <div className="text-center w-full text-muted-foreground">
-                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Nenhum gestor adicional</p>
-                      <p className="text-xs">Adicione funcionários como gestores da agenda</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Modal para Adicionar Gestor */}
-        {showAddManagerModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6">
-                {/* Passo 1: Seleção do Funcionário */}
-                {!showPermissionsStep && (
-                  <>
-                    <h2 className="text-xl font-semibold mb-4">Adicionar Gestor da Agenda</h2>
-                    <p className="text-sm text-muted-foreground mb-6">
-                      Selecione um funcionário para dar permissões de gestão da agenda
-                    </p>
-                    
-                    {availableEmployees.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">Nenhum funcionário disponível</p>
-                        <p className="text-sm text-muted-foreground">
-                          Adicione funcionários no perfil do salão primeiro
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {availableEmployees.map((employee) => (
-                          <div
-                            key={employee.id}
-                            className="p-3 rounded-lg border border-gray-200 hover:border-gray-300 cursor-pointer transition-colors"
-                            onClick={() => handleSelectEmployee(employee.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={employee.user?.profile_photo} />
-                                <AvatarFallback>
-                                  {employee.user?.name?.charAt(0) || 'F'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <h4 className="font-medium text-sm">
-                                  {employee.user?.name || 'Funcionário'}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-sm sm:text-base truncate">
+                            {appointment.client?.name || 'Cliente não informado'}
                                 </h4>
+                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                            {appointment.service?.name || 'Serviço não informado'}
+                          </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {employee.role || 'Funcionário'}
+                            com {appointment.professional?.name || 'Profissional não informado'}
                                 </p>
                               </div>
-                              <div className="w-4 h-4 border-2 border-gray-300 rounded-full"></div>
                             </div>
                           </div>
                         ))}
                       </div>
-                    )}
-                    
-                    <div className="flex gap-3 mt-6">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={handleCancelAddManager}
-                      >
-                        Cancelar
+              )
+            })()}
+            <Button variant="outline" className="w-full mt-4 border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/30 transition-colors" asChild>
+              <Link to="/agenda-completa">Ver todos os agendamentos</Link>
                       </Button>
-                    </div>
-                  </>
-                )}
+          </CardContent>
+        </Card>
 
-                {/* Passo 2: Configuração de Permissões */}
-                {showPermissionsStep && selectedEmployee && (
-                  <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleBackToEmployeeSelection}
-                        className="p-0 h-auto"
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                      </Button>
-                      <div>
-                        <h2 className="text-xl font-semibold">Configurar Permissões</h2>
-                        <p className="text-sm text-muted-foreground">
-                          {availableEmployees.find(emp => emp.id === selectedEmployee)?.user?.name || 'Funcionário'}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-6">
-                      {getAgendaRelatedPermissions().map((category) => (
-                        <div key={category.id}>
-                          <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-                            <span className="text-lg">{category.icon}</span>
-                            {category.title}
-                          </h3>
-                          <div className="space-y-2">
-                            {category.permissions.map((permission) => {
-                              const [categoryKey, permissionKey] = permission.key.split('.')
-                              const isChecked = permissions[categoryKey as keyof typeof permissions]?.[permissionKey as any] || false
-                              
-                              return (
-                                <label key={permission.key} className="flex items-start gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={(e) => handlePermissionChange(categoryKey, permissionKey, e.target.checked)}
-                                    className="rounded mt-0.5"
-                                  />
-                                  <div className="flex-1">
-                                    <div className="font-medium">{permission.label}</div>
-                                    {permission.description && (
-                                      <div className="text-xs text-muted-foreground">{permission.description}</div>
-                                    )}
-                                  </div>
-                                </label>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="flex gap-3 mt-6">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={handleBackToEmployeeSelection}
-                      >
-                        Voltar
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={handleConfirmAddManager}
-                        disabled={addingManager || !Object.values(permissions).some(category => 
-                          Object.values(category).some(permission => permission)
-                        )}
-                      >
-                        {addingManager ? 'Adicionando...' : 'Adicionar Gestor'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Modal para Editar Gestor */}
-        {showEditManagerModal && editingEmployee && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={editingEmployee.user?.profile_photo} />
-                    <AvatarFallback>
-                      {editingEmployee.user?.name?.charAt(0) || 'G'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="text-xl font-semibold">Editar Permissões da Agenda</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {editingEmployee.user?.name || 'Gestor'}
-                    </p>
-                  </div>
-                </div>
+        {/* Gestores da Agenda - REMOVIDO (não há mais sistema de permissões) */}
 
-                <div className="space-y-6">
-                  {getAgendaRelatedPermissions().map((category) => (
-                    <div key={category.id}>
-                      <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-                        <span className="text-lg">{category.icon}</span>
-                        {category.title}
-                      </h3>
-                      <div className="space-y-2">
-                        {category.permissions.map((permission) => {
-                          const [categoryKey, permissionKey] = permission.key.split('.')
-                          const isChecked = editingPermissions[categoryKey as keyof typeof editingPermissions]?.[permissionKey as any] || false
-                          
-                          return (
-                            <label key={permission.key} className="flex items-start gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => handleEditPermissionChange(categoryKey, permissionKey, e.target.checked)}
-                                className="rounded mt-0.5"
-                              />
-                              <div className="flex-1">
-                                <div className="font-medium">{permission.label}</div>
-                                {permission.description && (
-                                  <div className="text-xs text-muted-foreground">{permission.description}</div>
-                                )}
-                              </div>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="flex gap-3 mt-6">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleCancelEditManager}
-                    disabled={updatingManager}
-                  >
-                    Cancelar
-                  </Button>
-                                      <Button
-                      className="flex-1"
-                      onClick={handleConfirmEditManager}
-                      disabled={updatingManager}
-                    >
-                      {updatingManager ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                {/* Modais de Gestores - REMOVIDOS (não há mais sistema de permissões) */}
       </div>
     </div>
   );

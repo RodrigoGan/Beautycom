@@ -25,6 +25,7 @@ export const ProfilePhotoUpload = ({
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(currentPhoto || null)
   const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // Atualizar previewPhoto quando currentPhoto mudar
   useEffect(() => {
@@ -80,18 +81,14 @@ export const ProfilePhotoUpload = ({
 
   const handleCameraClick = () => {
     setShowPhotoMenu(false)
-    if (fileInputRef.current) {
-      fileInputRef.current.accept = "image/*"
-      fileInputRef.current.capture = "environment"
-      fileInputRef.current.click()
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click()
     }
   }
 
   const handleGalleryClick = () => {
     setShowPhotoMenu(false)
     if (fileInputRef.current) {
-      fileInputRef.current.accept = "image/*"
-      fileInputRef.current.capture = undefined
       fileInputRef.current.click()
     }
   }
@@ -130,7 +127,10 @@ export const ProfilePhotoUpload = ({
       {/* Avatar */}
       <div className="relative">
         <Avatar className="w-24 h-24 ring-4 ring-primary/20 shadow-beauty">
-          <AvatarImage src={previewPhoto || ''} />
+          <AvatarImage 
+            src={previewPhoto || ''} 
+            className="object-cover object-center"
+          />
           <AvatarFallback className="text-2xl bg-gradient-hero text-white">
             {user?.name?.charAt(0) || user?.nickname?.charAt(0) || 'U'}
           </AvatarFallback>
@@ -201,6 +201,14 @@ export const ProfilePhotoUpload = ({
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         onChange={handleFileUpload}
         className="hidden"
       />
