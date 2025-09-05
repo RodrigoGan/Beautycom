@@ -30,6 +30,11 @@ export const useStripe = () => {
       const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
       const stripeSecretKey = import.meta.env.STRIPE_SECRET_KEY;
       
+      console.log('🔍 DEBUG Stripe Keys:');
+      console.log('  - stripePublishableKey:', stripePublishableKey ? `${stripePublishableKey.substring(0, 20)}...` : 'undefined');
+      console.log('  - stripeSecretKey:', stripeSecretKey ? `${stripeSecretKey.substring(0, 20)}...` : 'undefined');
+      console.log('  - import.meta.env keys:', Object.keys(import.meta.env).filter(key => key.includes('STRIPE')));
+      
       console.log('Chave pública detectada:', stripePublishableKey ? '✅ Configurada' : '❌ Não configurada');
       console.log('Chave secreta detectada:', stripeSecretKey ? '✅ Configurada' : '❌ Não configurada');
       

@@ -321,6 +321,11 @@ export const useSalonProfessionals = (salonId: string | null) => {
 
       // 3. Adicionar o profissional à subscription_professionals (se não existir)
       // Primeiro, buscar a assinatura ativa do dono do salão
+      if (!salonId) {
+        console.error('❌ salonId é null, pulando busca do dono do salão')
+        return { success: true, data: updateData }
+      }
+      
       const { data: salonData } = await supabase
         .from('salons_studios')
         .select('owner_id')
@@ -445,6 +450,11 @@ export const useSalonProfessionals = (salonId: string | null) => {
 
       // 3. Remover o profissional da subscription_professionals
       // Primeiro, buscar a assinatura ativa do dono do salão
+      if (!salonId) {
+        console.error('❌ salonId é null, pulando busca do dono do salão')
+        return { success: true, data: updateData }
+      }
+      
       const { data: salonData } = await supabase
         .from('salons_studios')
         .select('owner_id')
