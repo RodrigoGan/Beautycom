@@ -9,6 +9,8 @@ export const useStripe = () => {
   const { user } = useAuthContext();
 
   const createCheckoutSession = async (planType: PlanType) => {
+    console.log('🚀 createCheckoutSession chamada para planType:', planType);
+    
     if (!user) {
       setError('Usuário não autenticado');
       return;
