@@ -18,10 +18,10 @@ import { SubscriptionSummaryCard } from "@/components/SubscriptionSummaryCard"
 const AgendaProfissional = () => {
   const { user } = useAuthContext()
   const { userSalon } = useSalons(user?.id)
-  const { hasPermission, isOwner, isEmployee, loading: permissionsLoading } = useSalonPermissions(userSalon?.id)
+  const { hasPermission, isOwner, isEmployee, loading: permissionsLoading } = useSalonPermissions(userSalon?.id || null)
   const { appointments, loading: appointmentsLoading, fetchSalonAppointments, todayAppointments, upcomingAppointments } = useAppointments()
-  const { professionals, loading: professionalsLoading, fetchProfessionals, enableAgenda, disableAgenda } = useSalonProfessionals(userSalon?.id || '')
-  const { employees, loading: employeesLoading, fetchEmployees, updateEmployee } = useSalonEmployees(userSalon?.id || '')
+  const { professionals, loading: professionalsLoading, fetchProfessionals, enableAgenda, disableAgenda } = useSalonProfessionals(userSalon?.id || null)
+  const { employees, loading: employeesLoading, fetchEmployees, updateEmployee } = useSalonEmployees(userSalon?.id || null)
   
   // Estados para o modal de adicionar gestor
   const [showAddManagerModal, setShowAddManagerModal] = useState(false)

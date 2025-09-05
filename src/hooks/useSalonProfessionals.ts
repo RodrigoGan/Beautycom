@@ -28,7 +28,7 @@ export interface SalonProfessional {
   }
 }
 
-export const useSalonProfessionals = (salonId: string) => {
+export const useSalonProfessionals = (salonId: string | null) => {
   const { user } = useAuthContext()
   const [professionals, setProfessionals] = useState<SalonProfessional[]>([])
   const [loading, setLoading] = useState(false)

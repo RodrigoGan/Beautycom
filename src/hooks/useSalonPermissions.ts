@@ -124,7 +124,7 @@ export const DEFAULT_PERMISSIONS: Record<string, EmployeePermissions> = {
   }
 }
 
-export const useSalonPermissions = (salonId?: string) => {
+export const useSalonPermissions = (salonId?: string | null) => {
   const { user } = useAuthContext()
   const [userRole, setUserRole] = useState<UserRole>('none')
   const [userPermissions, setUserPermissions] = useState<EmployeePermissions | null>(null)

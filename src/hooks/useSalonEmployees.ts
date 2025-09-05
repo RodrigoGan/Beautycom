@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { SalonEmployee, EmployeePermissions, DEFAULT_PERMISSIONS } from '@/hooks/useSalonPermissions'
 
-export const useSalonEmployees = (salonId: string) => {
+export const useSalonEmployees = (salonId: string | null) => {
   const [employees, setEmployees] = useState<SalonEmployee[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
