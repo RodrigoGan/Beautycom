@@ -1,5 +1,5 @@
-const { stripe, STRIPE_CONFIG } = require('./config');
-const { createClient } = require('@supabase/supabase-js');
+import { stripe, STRIPE_CONFIG } from './config.js';
+import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -7,10 +7,10 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 );
 
-exports.handler = async (event, context) => {
+export default async function handler(req, res) {
   try {
-    const sig = event.headers['stripe-signature'];
-    const payload = event.body;
+    const sig = req.headers['stripe-signature'];
+    const payload = JSON.stringify(req.body);
 
     // Verificar webhook signature
     let stripeEvent;
@@ -22,10 +22,7 @@ exports.handler = async (event, context) => {
       );
     } catch (err) {
       console.error('Erro na verificação do webhook:', err.message);
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Webhook signature verification failed' }),
-      };
+      return res.status(400).json({ error: 'Webhook signature verification failed' });
     }
 
     // Processar diferentes tipos de eventos
@@ -58,19 +55,13 @@ exports.handler = async (event, context) => {
         console.log(`Evento não tratado: ${stripeEvent.type}`);
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ received: true }),
-    };
+    return res.status(200).json({ received: true });
 
   } catch (error) {
     console.error('Erro no webhook:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Erro interno do servidor' }),
-    };
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
-};
+}
 
 // Handler para sessão de checkout completada
 async function handleCheckoutSessionCompleted(session) {

@@ -1,5 +1,5 @@
-const { stripe } = require('./config');
-const { createClient } = require('@supabase/supabase-js');
+import { stripe } from './config.js';
+import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -7,43 +7,29 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 );
 
-exports.handler = async (event, context) => {
+export default async function handler(req, res) {
   // Configurar CORS
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 
   // Responder a requisições OPTIONS (preflight)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
   try {
     // Verificar se é uma requisição POST
-    if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers,
-        body: JSON.stringify({ error: 'Método não permitido' }),
-      };
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método não permitido' });
     }
 
     // Parse do body da requisição
-    const { userId } = JSON.parse(event.body);
+    const { userId } = req.body;
 
     // Validar parâmetros obrigatórios
     if (!userId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'userId é obrigatório' }),
-      };
+      return res.status(400).json({ error: 'userId é obrigatório' });
     }
 
     // Buscar assinatura ativa do usuário
@@ -55,11 +41,7 @@ exports.handler = async (event, context) => {
       .single();
 
     if (subError || !subscription) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: 'Assinatura ativa não encontrada' }),
-      };
+      return res.status(404).json({ error: 'Assinatura ativa não encontrada' });
     }
 
     // Cancelar assinatura no Stripe
@@ -94,32 +76,24 @@ exports.handler = async (event, context) => {
       console.error('Erro ao atualizar usuário:', userError);
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        subscription: {
-          id: canceledSubscription.id,
-          status: canceledSubscription.status,
-          canceled_at: new Date(canceledSubscription.canceled_at * 1000).toISOString(),
-        },
-      }),
-    };
+    return res.status(200).json({
+      success: true,
+      subscription: {
+        id: canceledSubscription.id,
+        status: canceledSubscription.status,
+        canceled_at: new Date(canceledSubscription.canceled_at * 1000).toISOString(),
+      },
+    });
 
   } catch (error) {
     console.error('Erro ao cancelar assinatura:', error);
     
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Erro interno do servidor',
-        details: error.message,
-      }),
-    };
+    return res.status(500).json({
+      error: 'Erro interno do servidor',
+      details: error.message,
+    });
   }
-};
+}
 
 
 

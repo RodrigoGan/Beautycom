@@ -1,5 +1,5 @@
-const { stripe, STRIPE_CONFIG, PLAN_MAPPING } = require('./config');
-const { createClient } = require('@supabase/supabase-js');
+import { stripe, STRIPE_CONFIG, PLAN_MAPPING } from './config.js';
+import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -7,53 +7,35 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 );
 
-exports.handler = async (event, context) => {
+export default async function handler(req, res) {
   // Configurar CORS
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 
   // Responder a requisições OPTIONS (preflight)
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
   try {
     // Verificar se é uma requisição POST
-    if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers,
-        body: JSON.stringify({ error: 'Método não permitido' }),
-      };
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método não permitido' });
     }
 
     // Parse do body da requisição
-    const { planType, userId, userEmail, userName } = JSON.parse(event.body);
+    const { planType, userId, userEmail, userName } = req.body;
 
     // Validar parâmetros obrigatórios
     if (!planType || !userId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'planType e userId são obrigatórios' }),
-      };
+      return res.status(400).json({ error: 'planType e userId são obrigatórios' });
     }
 
     // Verificar se o plano existe
     const priceId = PLAN_MAPPING[planType];
     if (!priceId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Plano inválido' }),
-      };
+      return res.status(400).json({ error: 'Plano inválido' });
     }
 
     // Buscar ou criar customer no Stripe
@@ -121,28 +103,20 @@ exports.handler = async (event, context) => {
       },
     });
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        sessionId: session.id,
-        url: session.url,
-      }),
-    };
+    return res.status(200).json({
+      sessionId: session.id,
+      url: session.url,
+    });
 
   } catch (error) {
     console.error('Erro ao criar sessão de checkout:', error);
     
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Erro interno do servidor',
-        details: error.message,
-      }),
-    };
+    return res.status(500).json({
+      error: 'Erro interno do servidor',
+      details: error.message,
+    });
   }
-};
+}
 
 
 
