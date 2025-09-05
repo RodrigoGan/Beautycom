@@ -1,59 +1,69 @@
--- =====================================================
--- VERIFICAR ESTRUTURA DAS TABELAS ENVOLVIDAS
--- =====================================================
+-- SQL para verificar a estrutura atual das tabelas
 
--- 1. ESTRUTURA DA TABELA posts
+-- 1. Verificar se a tabela user_subscriptions existe
 SELECT 
-    'ESTRUTURA TABELA posts' as secao,
+    table_name,
+    table_type
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name = 'user_subscriptions';
+
+-- 2. Se a tabela existir, verificar suas colunas
+SELECT 
     column_name,
     data_type,
     is_nullable,
     column_default
-FROM information_schema.columns
-WHERE table_name = 'posts'
+FROM information_schema.columns 
+WHERE table_name = 'user_subscriptions' 
+AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- 2. ESTRUTURA DA TABELA salon_professionals
+-- 3. Verificar colunas relacionadas a assinatura na tabela users
 SELECT 
-    'ESTRUTURA TABELA salon_professionals' as secao,
     column_name,
     data_type,
     is_nullable,
     column_default
-FROM information_schema.columns
-WHERE table_name = 'salon_professionals'
+FROM information_schema.columns 
+WHERE table_name = 'users' 
+AND table_schema = 'public'
+AND (column_name LIKE '%subscription%' OR column_name LIKE '%stripe%')
 ORDER BY ordinal_position;
 
--- 3. ESTRUTURA DA TABELA salon_main_posts (estrutura antiga)
+-- 4. Verificar se as funções foram criadas
 SELECT 
-    'ESTRUTURA TABELA salon_main_posts' as secao,
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
-FROM information_schema.columns
-WHERE table_name = 'salon_main_posts'
-ORDER BY ordinal_position;
+    routine_name,
+    routine_type,
+    data_type
+FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+AND routine_name IN ('has_active_subscription', 'get_active_plan');
 
--- 4. ESTRUTURA DA TABELA users
+-- 5. Verificar políticas RLS da tabela user_subscriptions
 SELECT 
-    'ESTRUTURA TABELA users' as secao,
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
-FROM information_schema.columns
-WHERE table_name = 'users'
-ORDER BY ordinal_position;
+    schemaname,
+    tablename,
+    policyname,
+    permissive,
+    roles,
+    cmd,
+    qual,
+    with_check
+FROM pg_policies 
+WHERE tablename = 'user_subscriptions';
 
--- 5. VERIFICAR SE OS CAMPOS NOVOS EXISTEM NA TABELA posts
+-- 6. Verificar se há dados na tabela user_subscriptions (se existir)
+SELECT COUNT(*) as total_registros
+FROM user_subscriptions;
+
+-- 7. Verificar estrutura completa da tabela users
 SELECT 
-    'VERIFICAÇÃO CAMPOS NOVOS posts' as secao,
     column_name,
     data_type,
     is_nullable,
     column_default
-FROM information_schema.columns
-WHERE table_name = 'posts'
-AND column_name IN ('is_salon_main_post', 'salon_main_post_priority')
-ORDER BY column_name;
+FROM information_schema.columns 
+WHERE table_name = 'users' 
+AND table_schema = 'public'
+ORDER BY ordinal_position;

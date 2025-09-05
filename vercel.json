@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "pages/api/stripe/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
+

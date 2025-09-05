@@ -1,112 +1,114 @@
-// Script para testar a conexão com o Supabase
-// Execute: node test-supabase-connection.js
-
+// Teste de conectividade com Supabase
 import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
 
-// Carregar variáveis de ambiente
-dotenv.config()
+const supabaseUrl = 'https://dgkzxadlmiafbegmdxcz.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRna3p4YWRsbWlhZmJlZ21keGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NzI4MDAsImV4cCI6MjA1MTU0ODgwMH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY
-
-console.log('🔍 Testando conexão com Supabase...')
-console.log('URL:', supabaseUrl)
-console.log('Key:', supabaseKey ? `${supabaseKey.substring(0, 20)}...` : 'NÃO ENCONTRADA')
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Variáveis de ambiente não encontradas!')
-  console.log('Verifique se o arquivo .env existe e contém:')
-  console.log('VITE_SUPABASE_URL=sua_url_aqui')
-  console.log('VITE_SUPABASE_ANON_KEY=sua_chave_aqui')
-  process.exit(1)
-}
+console.log('🧪 Iniciando teste de conectividade com Supabase...')
+console.log('🔗 URL:', supabaseUrl)
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-async function testConnection() {
+// Teste 1: Conectividade básica
+async function testBasicConnection() {
   try {
-    console.log('\n📡 Testando conexão básica...')
+    console.log('🔍 Teste 1: Verificando conectividade básica...')
     
-    // Teste 1: Verificar se consegue acessar a tabela users
-    console.log('1. Testando acesso à tabela users...')
-    const { data: testData, error: testError } = await supabase
+    const { data, error } = await supabase
       .from('users')
-      .select('id')
+      .select('count')
       .limit(1)
     
-    if (testError) {
-      console.error('❌ Erro ao acessar tabela users:', testError.message)
-      console.error('Código:', testError.code)
-      console.error('Detalhes:', testError.details)
-    } else {
-      console.log('✅ Tabela users acessível')
+    if (error) {
+      console.log('❌ Erro na conectividade:', error.message)
+      return false
     }
     
-    // Teste 2: Contar usuários
-    console.log('\n2. Contando usuários...')
-    const { count, error: countError } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-    
-    if (countError) {
-      console.error('❌ Erro ao contar usuários:', countError.message)
-    } else {
-      console.log(`✅ Total de usuários: ${count}`)
-    }
-    
-    // Teste 3: Buscar alguns usuários
-    console.log('\n3. Buscando usuários...')
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id, name, nickname, user_type')
-      .limit(5)
-    
-    if (usersError) {
-      console.error('❌ Erro ao buscar usuários:', usersError.message)
-    } else {
-      console.log('✅ Usuários encontrados:', users?.length || 0)
-      if (users && users.length > 0) {
-        console.log('Primeiro usuário:', users[0])
-      }
-    }
-    
-    // Teste 4: Testar filtros
-    console.log('\n4. Testando filtros...')
-    const { data: filteredUsers, error: filterError } = await supabase
-      .from('users')
-      .select('id, name, user_type')
-      .eq('user_type', 'profissional')
-      .limit(3)
-    
-    if (filterError) {
-      console.error('❌ Erro ao filtrar usuários:', filterError.message)
-    } else {
-      console.log(`✅ Profissionais encontrados: ${filteredUsers?.length || 0}`)
-    }
-    
-    // Teste 5: Verificar políticas RLS
-    console.log('\n5. Verificando políticas RLS...')
-    const { data: rlsTest, error: rlsError } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1)
-    
-    if (rlsError && rlsError.code === '42501') {
-      console.error('❌ Problema com políticas RLS:', rlsError.message)
-      console.log('💡 Execute o script verificar_rls_users.sql no Supabase SQL Editor')
-    } else if (rlsError) {
-      console.error('❌ Outro erro:', rlsError.message)
-    } else {
-      console.log('✅ Políticas RLS funcionando')
-    }
-    
-    console.log('\n🎉 Teste concluído!')
-    
+    console.log('✅ Conectividade básica OK')
+    return true
   } catch (error) {
-    console.error('❌ Erro geral:', error.message)
-    console.error('Stack:', error.stack)
+    console.log('❌ Erro de rede:', error.message)
+    return false
   }
 }
 
-testConnection() 
+// Teste 2: Autenticação
+async function testAuth() {
+  try {
+    console.log('🔍 Teste 2: Testando autenticação...')
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: 'rodrigo_gan@hotmail.com',
+      password: 'teste123'
+    })
+    
+    if (error) {
+      console.log('❌ Erro na autenticação:', error.message)
+      return false
+    }
+    
+    console.log('✅ Autenticação OK')
+    console.log('👤 Usuário:', data.user?.id)
+    return true
+  } catch (error) {
+    console.log('❌ Erro na autenticação:', error.message)
+    return false
+  }
+}
+
+// Teste 3: Query simples
+async function testSimpleQuery() {
+  try {
+    console.log('🔍 Teste 3: Testando query simples...')
+    
+    const startTime = Date.now()
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .limit(5)
+    
+    const endTime = Date.now()
+    const duration = endTime - startTime
+    
+    if (error) {
+      console.log('❌ Erro na query:', error.message)
+      return false
+    }
+    
+    console.log('✅ Query simples OK')
+    console.log('⏱️ Duração:', duration + 'ms')
+    console.log('📊 Dados retornados:', data?.length || 0)
+    return true
+  } catch (error) {
+    console.log('❌ Erro na query:', error.message)
+    return false
+  }
+}
+
+// Executar todos os testes
+async function runAllTests() {
+  console.log('🚀 Executando todos os testes...')
+  
+  const results = {
+    basicConnection: await testBasicConnection(),
+    auth: await testAuth(),
+    simpleQuery: await testSimpleQuery()
+  }
+  
+  console.log('📊 Resultados dos testes:')
+  console.log('🔗 Conectividade básica:', results.basicConnection ? '✅' : '❌')
+  console.log('🔐 Autenticação:', results.auth ? '✅' : '❌')
+  console.log('📝 Query simples:', results.simpleQuery ? '✅' : '❌')
+  
+  const allPassed = Object.values(results).every(result => result)
+  
+  if (allPassed) {
+    console.log('🎉 Todos os testes passaram! Supabase está funcionando normalmente.')
+  } else {
+    console.log('⚠️ Alguns testes falharam. Há problemas com o Supabase.')
+  }
+}
+
+// Executar testes
+runAllTests().catch(console.error) 

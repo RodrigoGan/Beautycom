@@ -5,6 +5,7 @@ import { Badge } from './ui/badge'
 import { Check, X, CreditCard, Gift, Crown, Zap, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useStripe } from '@/hooks/useStripe'
 import { supabase } from '@/lib/supabase'
 import {
   Dialog,
@@ -41,6 +42,7 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
 }) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
+  const { createCheckoutSession, loading: stripeLoading, error: stripeError } = useStripe()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
@@ -185,8 +187,15 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
     try {
       setSelectedPlan(planId)
       
-      // TODO: Integrar com Stripe aqui
-      // Por enquanto, vamos simular o processo
+      // Mapear planId para PlanType do Stripe
+      const planMapping: { [key: string]: string } = {
+        'start': 'basic',
+        'pro': 'premium', 
+        'plus': 'enterprise',
+        'ad': 'additional' // BeautyTime Ad
+      }
+      
+      const stripePlanType = planMapping[planId] || 'basic'
       
       toast({
         title: 'Redirecionando para pagamento...',
@@ -194,21 +203,17 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
         variant: 'default'
       })
 
-      // Simular redirecionamento para Stripe
-      setTimeout(() => {
-        toast({
-          title: 'Integração Stripe',
-          description: 'Esta funcionalidade será implementada em breve. Por enquanto, você pode testar o sistema com o trial gratuito.',
-          variant: 'default'
-        })
-        onClose()
-      }, 2000)
+      // Usar o Stripe para processar o pagamento
+      await createCheckoutSession(stripePlanType as any)
+      
+      // Fechar modal após redirecionamento
+      onClose()
 
     } catch (error) {
       console.error('Erro ao selecionar plano:', error)
       toast({
         title: 'Erro ao processar',
-        description: 'Não foi possível processar a seleção do plano.',
+        description: stripeError || 'Não foi possível processar a seleção do plano.',
         variant: 'destructive'
       })
     } finally {
@@ -313,9 +318,9 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
                     <Button 
                       className="w-full"
                       variant={isPopular ? 'default' : 'outline'}
-                      disabled={isSelected}
+                      disabled={isSelected || stripeLoading}
                     >
-                      {isSelected ? (
+                      {isSelected || stripeLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           Processando...
@@ -380,9 +385,9 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
                       <Button 
                         className="w-full"
                         variant="outline"
-                        disabled={isSelected}
+                        disabled={isSelected || stripeLoading}
                       >
-                        {isSelected ? (
+                        {isSelected || stripeLoading ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Processando...

@@ -1,0 +1,26 @@
+{
+  "name": "beautycom-api",
+  "version": "1.0.0",
+  "description": "API backend para Beautycom",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev",
+    "build": "echo 'No build step required'",
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "stripe": "^14.0.0",
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "keywords": ["stripe", "supabase", "api"],
+  "author": "Beautycom",
+  "license": "MIT"
+}
+
+
+
+
+

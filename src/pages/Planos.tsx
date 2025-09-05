@@ -2,11 +2,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BackButton } from "@/components/ui/back-button"
-import { Check, Star, Calendar, Bell, Users, BarChart3, Smartphone } from "lucide-react"
+import { Check, Star, Calendar, Bell, Users, BarChart3, Smartphone, Loader2 } from "lucide-react"
 import { Header } from "@/components/Header"
+import { useStripe } from "@/hooks/useStripe"
+import { PLAN_CONFIGS, PlanType } from "@/lib/stripe"
+import { useState } from "react"
 import plansImage from "@/assets/plans-beauty.jpg"
 
 const Planos = () => {
+  const { createCheckoutSession, loading, error } = useStripe();
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
+
+  const handleSelectPlan = async (planType: PlanType) => {
+    setSelectedPlan(planType);
+    await createCheckoutSession(planType);
+  };
+
   const planos = [
     {
       id: "start",
@@ -83,6 +94,15 @@ const Planos = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Transforme sua agenda em uma ferramenta profissional
           </p>
+          
+          {/* Exibir erro do Stripe se houver */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
+              <p className="text-red-800 text-sm">
+                <strong>Erro:</strong> {error}
+              </p>
+            </div>
+          )}
           <div className="relative rounded-2xl overflow-hidden max-w-4xl mx-auto mb-8">
             <img 
               src={plansImage} 
@@ -124,8 +144,17 @@ const Planos = () => {
                 <Button 
                   variant={plano.destaque ? "hero" : "outline"} 
                   className="w-full"
+                  onClick={() => handleSelectPlan(plano.id as PlanType)}
+                  disabled={loading}
                 >
-                  Assinar Agora
+                  {loading && selectedPlan === plano.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    'Assinar Agora'
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -148,8 +177,20 @@ const Planos = () => {
             </p>
             <Badge variant="outline" className="mb-4">Sem limite de profissionais</Badge>
             <br />
-            <Button variant="outline" className="mt-4">
-              Adicionar Profissionais
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => handleSelectPlan('additional' as PlanType)}
+              disabled={loading}
+            >
+              {loading && selectedPlan === 'additional' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Adicionar Profissionais'
+              )}
             </Button>
           </CardContent>
         </Card>
