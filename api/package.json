@@ -2,7 +2,6 @@
   "name": "beautycom-api",
   "version": "1.0.0",
   "description": "API backend para Beautycom",
-  "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "echo 'No build step required'"
