@@ -1,5 +1,5 @@
-const { stripe, STRIPE_CONFIG, PLAN_MAPPING } = require('./config');
-const { createClient } = require('@supabase/supabase-js');
+import { stripe, STRIPE_CONFIG, PLAN_MAPPING } from './config.js';
+import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Supabase
 const supabase = createClient(

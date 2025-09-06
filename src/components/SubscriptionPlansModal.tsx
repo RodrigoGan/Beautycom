@@ -191,7 +191,7 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
       const planMapping: { [key: string]: string } = {
         'start': 'basic',
         'pro': 'premium', 
-        'plus': 'enterprise',
+        'plus': 'plus',
         'ad': 'additional' // BeautyTime Ad
       }
       

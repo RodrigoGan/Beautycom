@@ -1,5 +1,6 @@
 // Configuração do Stripe para o backend
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Configurações do Stripe
 const STRIPE_CONFIG = {
@@ -8,15 +9,18 @@ const STRIPE_CONFIG = {
   webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
 };
 
-// Mapeamento dos planos
+// Mapeamento dos planos (alinhado com src/lib/stripe.ts)
 const PLAN_MAPPING = {
-  'start': 'price_1QZ8XxSGdt04aH4j0bSkiVkGIaJuiS8ukPuaeXdUprBI6dp84teWx2fnnn86QnhmhxEvKaav0V7R2HFtBSZMWww3C00BV0NAwbi',
-  'pro': 'price_1QZ8Y0SGdt04aH4j0bSkiVkGIaJuiS8ukPuaeXdUprBI6dp84teWx2fnnn86QnhmhxEvKaav0V7R2HFtBSZMWww3C00BV0NAwbi',
-  'plus': 'price_1QZ8Y1SGdt04aH4j0bSkiVkGIaJuiS8ukPuaeXdUprBI6dp84teWx2fnnn86QnhmhxEvKaav0V7R2HFtBSZMWww3C00BV0NAwbi',
-  'additional': 'price_1QZ8Y2SGdt04aH4j0bSkiVkGIaJuiS8ukPuaeXdUprBI6dp84teWx2fnnn86QnhmhxEvKaav0V7R2HFtBSZMWww3C00BV0NAwbi'
+  'basic': 'price_1S43Q6Gdt04aH4j03KJt0wXk', // BeautyTime Start
+  'premium': 'price_1S43SfGdt04aH4j0kT3Raqih', // BeautyTime Pro
+  'plus': 'price_1S43UTGdt04aH4j0SxLDFbtC', // BeautyTime Plus
+  'additional': 'price_1S43VlGdt04aH4j0Wohp1FgE', // BeautyTime Ad
+  // Aliases para compatibilidade
+  'start': 'price_1S43Q6Gdt04aH4j03KJt0wXk',
+  'pro': 'price_1S43SfGdt04aH4j0kT3Raqih'
 };
 
-module.exports = {
+export {
   stripe,
   STRIPE_CONFIG,
   PLAN_MAPPING
