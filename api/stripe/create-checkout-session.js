@@ -3,14 +3,26 @@ import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-console.log('🔍 DEBUG Stripe Secret Key:', stripeSecretKey ? `${stripeSecretKey.substring(0, 20)}...${stripeSecretKey.substring(-10)}` : 'undefined');
+console.log('🔍 DEBUG Stripe Secret Key RAW:', stripeSecretKey);
 console.log('🔍 DEBUG Key length:', stripeSecretKey ? stripeSecretKey.length : 0);
 
-  if (!stripeSecretKey) {
-    throw new Error('STRIPE_SECRET_KEY não está configurada');
-  }
+if (!stripeSecretKey) {
+  throw new Error('STRIPE_SECRET_KEY não está configurada');
+}
 
-const stripe = new Stripe(stripeSecretKey);
+// Verificar se a chave está corrompida (duplicada)
+let finalKey = stripeSecretKey;
+if (stripeSecretKey.includes('sk_live_51PIqcSGdt04...sk_live_51PIqcSGdt04')) {
+  console.log('🚨 CHAVE CORROMPIDA DETECTADA! Extraindo chave correta...');
+  // Extrair apenas a parte correta da chave
+  const parts = stripeSecretKey.split('sk_live_51PIqcSGdt04...');
+  if (parts.length > 1) {
+    finalKey = 'sk_live_51PIqcSGdt04' + parts[1];
+    console.log('🔧 Chave corrigida:', finalKey.substring(0, 20) + '...' + finalKey.substring(-10));
+  }
+}
+
+const stripe = new Stripe(finalKey);
 
 // Configurações do Stripe
 const STRIPE_CONFIG = {
