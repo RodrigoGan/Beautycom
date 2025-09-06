@@ -1,5 +1,28 @@
-import { stripe, STRIPE_CONFIG, PLAN_MAPPING } from './config.js';
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+
+// Configuração do Stripe
+console.log('🔍 DEBUG Stripe Secret Key:', process.env.STRIPE_SECRET_KEY ? `${process.env.STRIPE_SECRET_KEY.substring(0, 20)}...${process.env.STRIPE_SECRET_KEY.substring(-10)}` : 'undefined');
+console.log('🔍 DEBUG Key length:', process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.length : 0);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Configurações do Stripe
+const STRIPE_CONFIG = {
+  successUrl: process.env.STRIPE_SUCCESS_URL || 'https://beautycom.com.br/planos?success=true',
+  cancelUrl: process.env.STRIPE_CANCEL_URL || 'https://beautycom.com.br/planos?canceled=true',
+  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+};
+
+// Mapeamento dos planos (alinhado com src/lib/stripe.ts)
+const PLAN_MAPPING = {
+  'basic': 'price_1S43Q6Gdt04aH4j03KJt0wXk', // BeautyTime Start
+  'premium': 'price_1S43SfGdt04aH4j0kT3Raqih', // BeautyTime Pro
+  'plus': 'price_1S43UTGdt04aH4j0SxLDFbtC', // BeautyTime Plus
+  'additional': 'price_1S43VlGdt04aH4j0Wohp1FgE', // BeautyTime Ad
+  // Aliases para compatibilidade
+  'start': 'price_1S43Q6Gdt04aH4j03KJt0wXk',
+  'pro': 'price_1S43SfGdt04aH4j0kT3Raqih'
+};
 
 // Configuração do Supabase
 const supabase = createClient(
