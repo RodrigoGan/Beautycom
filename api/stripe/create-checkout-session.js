@@ -12,14 +12,12 @@ if (!stripeSecretKey) {
 
 // Verificar se a chave está corrompida (duplicada)
 let finalKey = stripeSecretKey;
-if (stripeSecretKey.includes('sk_live_51PIqcSGdt04...sk_live_51PIqcSGdt04')) {
+if (stripeSecretKey.includes('...sk_live_')) {
   console.log('🚨 CHAVE CORROMPIDA DETECTADA! Extraindo chave correta...');
-  // Extrair apenas a parte correta da chave
-  const parts = stripeSecretKey.split('sk_live_51PIqcSGdt04...');
-  if (parts.length > 1) {
-    finalKey = 'sk_live_51PIqcSGdt04' + parts[1];
-    console.log('🔧 Chave corrigida:', finalKey.substring(0, 20) + '...' + finalKey.substring(-10));
-  }
+  // Extrair apenas a primeira parte da chave (antes da duplicação)
+  const firstPart = stripeSecretKey.split('...sk_live_')[0];
+  finalKey = firstPart;
+  console.log('🔧 Chave corrigida:', finalKey.substring(0, 20) + '...' + finalKey.substring(-10));
 }
 
 const stripe = new Stripe(finalKey);
