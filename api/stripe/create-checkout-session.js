@@ -2,9 +2,15 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Stripe
-console.log('🔍 DEBUG Stripe Secret Key:', process.env.STRIPE_SECRET_KEY ? `${process.env.STRIPE_SECRET_KEY.substring(0, 20)}...${process.env.STRIPE_SECRET_KEY.substring(-10)}` : 'undefined');
-console.log('🔍 DEBUG Key length:', process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.length : 0);
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+console.log('🔍 DEBUG Stripe Secret Key:', stripeSecretKey ? `${stripeSecretKey.substring(0, 20)}...${stripeSecretKey.substring(-10)}` : 'undefined');
+console.log('🔍 DEBUG Key length:', stripeSecretKey ? stripeSecretKey.length : 0);
+
+  if (!stripeSecretKey) {
+    throw new Error('STRIPE_SECRET_KEY não está configurada');
+  }
+
+const stripe = new Stripe(stripeSecretKey);
 
 // Configurações do Stripe
 const STRIPE_CONFIG = {
