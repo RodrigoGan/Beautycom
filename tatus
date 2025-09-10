@@ -1,5 +1,1 @@
-[33m978891c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m trigger: novo deploy após corrigir nome da variável VITE_STRIPE_PUBLISHABLE_KEY
-[33m2d265ff[m fix: adicionar logs de debug para Stripe e proteção adicional contra salonId null
-[33m7392b11[m trigger: novo deploy para aplicar variáveis de ambiente do Stripe
-[33mc94ef6d[m fix: corrigir erro 400 do Supabase quando salonId é null - atualizar hooks para aceitar null como salonId
-[33mc1f2118[m fix: limpar estrutura da API e remover configuração de functions do Vercel
+[33m064f385[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m fix: remover lógica de salon_id e implementar sistema baseado apenas em assinatura ativa
