@@ -95,6 +95,7 @@ const NovoAgendamento = () => {
   const [clientesFiltrados, setClientesFiltrados] = useState<any[]>([])
   const [showClientesDropdown, setShowClientesDropdown] = useState(false)
   const [clienteSelecionado, setClienteSelecionado] = useState<any>(null)
+  const [clienteFinal, setClienteFinal] = useState<any>(null) // Cliente validado para o agendamento
   const [loadingClientes, setLoadingClientes] = useState(false)
 
   // Estados para serviços
@@ -182,21 +183,35 @@ const NovoAgendamento = () => {
         setLoadingProfissionais(true)
         console.log('NovoAgendamento - Carregando profissionais com agenda ativa')
         
-        // Buscar todos os profissionais com agenda ativa
-        const { data: profissionaisData, error } = await supabase
-          .from('users')
-          .select('id, name, email, profile_photo, user_type, agenda_enabled')
-          .eq('user_type', 'profissional')
-          .eq('agenda_enabled', true)
-          .order('name')
-        
-        if (error) {
-          console.error('Erro ao carregar profissionais:', error)
-          return
+        // Se o usuário é profissional, mostrar apenas ele mesmo
+        if (user?.user_type === 'profissional') {
+          const profissionalData = [{
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            profile_photo: user.profile_photo,
+            user_type: user.user_type,
+            agenda_enabled: user.agenda_enabled
+          }]
+          setProfissionais(profissionalData)
+          console.log('NovoAgendamento - Profissional independente carregado:', user.name)
+        } else {
+          // Buscar todos os profissionais com agenda ativa (para administradores)
+          const { data: profissionaisData, error } = await supabase
+            .from('users')
+            .select('id, name, email, profile_photo, user_type, agenda_enabled')
+            .eq('user_type', 'profissional')
+            .eq('agenda_enabled', true)
+            .order('name')
+          
+          if (error) {
+            console.error('Erro ao carregar profissionais:', error)
+            return
+          }
+          
+          setProfissionais(profissionaisData || [])
+          console.log('NovoAgendamento - Profissionais com agenda ativa carregados:', profissionaisData?.length || 0)
         }
-        
-        setProfissionais(profissionaisData || [])
-        console.log('NovoAgendamento - Profissionais com agenda ativa carregados:', profissionaisData?.length || 0)
         
       } catch (error) {
         console.error('Erro ao carregar profissionais:', error)
@@ -358,26 +373,29 @@ const NovoAgendamento = () => {
     }
 
     // Encontrar cliente por nome se não foi selecionado do dropdown
-    let clienteFinal = clienteSelecionado
+    let clienteFinalTemp = clienteSelecionado
     
-    if (!clienteFinal && formData.cliente.trim()) {
+    if (!clienteFinalTemp && formData.cliente.trim()) {
       // Tentar encontrar por nome exato primeiro
-      clienteFinal = clientes.find(c => 
+      clienteFinalTemp = clientes.find(c => 
         c.name.toLowerCase() === formData.cliente.toLowerCase()
       )
       
       // Se não encontrar, tentar por nome parcial
-      if (!clienteFinal) {
-        clienteFinal = clientes.find(c => 
+      if (!clienteFinalTemp) {
+        clienteFinalTemp = clientes.find(c => 
           c.name.toLowerCase().includes(formData.cliente.toLowerCase())
         )
       }
     }
     
-    if (!clienteFinal?.id) {
+    if (!clienteFinalTemp?.id) {
       setErrors(prev => ({ ...prev, cliente: 'Selecione um cliente válido' }))
       return
     }
+    
+    // Armazenar o cliente final para usar no modal
+    setClienteFinal(clienteFinalTemp)
 
     if (!formData.profissional) {
       setErrors(prev => ({ ...prev, profissional: 'Selecione um profissional' }))
@@ -734,15 +752,17 @@ const confirmAppointment = async () => {
                   <Input 
                     id="profissional" 
                     value={profissionais.find(p => p.id === formData.profissional)?.name || user?.name || 'Selecione um profissional'}
-                    onClick={() => setShowProfissionaisDropdown(!showProfissionaisDropdown)}
+                    onClick={() => user?.user_type !== 'profissional' && setShowProfissionaisDropdown(!showProfissionaisDropdown)}
                     readOnly
-                    className="cursor-pointer bg-background"
-                    placeholder="Clique para selecionar um profissional"
+                    className={`bg-background ${user?.user_type === 'profissional' ? 'cursor-default' : 'cursor-pointer'}`}
+                    placeholder={user?.user_type === 'profissional' ? 'Você' : 'Clique para selecionar um profissional'}
                   />
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  {user?.user_type !== 'profissional' && (
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  )}
                   
-                  {/* Dropdown de profissionais */}
-                  {showProfissionaisDropdown && (
+                  {/* Dropdown de profissionais - apenas para não profissionais */}
+                  {showProfissionaisDropdown && user?.user_type !== 'profissional' && (
                     <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto" data-profissional-dropdown>
                       {loadingProfissionais ? (
                         <div className="p-3 text-center text-muted-foreground">
@@ -777,7 +797,9 @@ const confirmAppointment = async () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {formData.profissional === user?.id 
+                  {user?.user_type === 'profissional'
+                    ? 'O agendamento será criado para você como profissional'
+                    : formData.profissional === user?.id 
                     ? 'O agendamento será criado para você como profissional'
                     : 'Selecione o profissional que realizará o serviço'
                   }
@@ -967,11 +989,11 @@ const confirmAppointment = async () => {
               <div className="bg-muted/30 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={clienteSelecionado?.profile_photo} />
-                    <AvatarFallback>{clienteSelecionado?.name?.charAt(0) || 'C'}</AvatarFallback>
+                    <AvatarImage src={clienteFinal?.profile_photo} />
+                    <AvatarFallback>{clienteFinal?.name?.charAt(0) || 'C'}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold">{clienteSelecionado?.name || 'Cliente'}</p>
+                    <p className="font-semibold">{clienteFinal?.name || 'Cliente'}</p>
                     <p className="text-sm text-muted-foreground">{formData.telefone}</p>
                   </div>
                 </div>
