@@ -44,8 +44,7 @@ const NovoAgendamento = () => {
   const { user } = useAuthContext()
   console.log('NovoAgendamento - User:', user?.id)
   
-  const { userSalon } = useSalons(user?.id)
-  console.log('NovoAgendamento - UserSalon:', userSalon?.id)
+  // Removido userSalon - não é mais necessário
   
   const { createAppointment } = useAppointments()
   const { toast } = useToast()
@@ -69,10 +68,10 @@ const NovoAgendamento = () => {
 
   // Inicializar profissional com o usuário atual se ele for profissional
   useEffect(() => {
-    if (user?.user_type === 'profissional' && userSalon?.id) {
+    if (user?.user_type === 'profissional') {
       setFormData(prev => ({ ...prev, profissional: user.id }))
     }
-  }, [user?.id, user?.user_type, userSalon?.id])
+  }, [user?.id, user?.user_type])
 
   // Auto-selecionar profissional quando há apenas um disponível
   useEffect(() => {
@@ -137,7 +136,7 @@ const NovoAgendamento = () => {
 
   // Carregar serviços baseados no profissional selecionado
   useEffect(() => {
-    if (!userSalon?.id || !formData.profissional) {
+    if (!formData.profissional) {
       setServicos([])
       return
     }
@@ -156,7 +155,6 @@ const NovoAgendamento = () => {
           .from('professional_services')
           .select('id, name, description, duration_minutes, price, category, professional_id')
           .eq('is_active', true)
-          .eq('salon_id', userSalon.id)
           .eq('professional_id', formData.profissional) // Filtrar por profissional selecionado
           .order('name')
         
@@ -173,93 +171,32 @@ const NovoAgendamento = () => {
     }
 
     fetchServicos()
-  }, [userSalon?.id, formData.profissional])
+  }, [formData.profissional])
 
-  // Carregar profissionais do salão
+  // Carregar profissionais com agenda ativa
   useEffect(() => {
-    if (!userSalon?.id) return
+    if (!user?.id) return
     
     const fetchProfissionais = async () => {
       try {
         setLoadingProfissionais(true)
-        console.log('NovoAgendamento - Carregando profissionais do salão:', userSalon.id)
+        console.log('NovoAgendamento - Carregando profissionais com agenda ativa')
         
-        // VERIFICAR SE O USUÁRIO É DONO DO SALÃO
-        const isUserOwner = userSalon.owner_id === user?.id
+        // Buscar todos os profissionais com agenda ativa
+        const { data: profissionaisData, error } = await supabase
+          .from('users')
+          .select('id, name, email, profile_photo, user_type, agenda_enabled')
+          .eq('user_type', 'profissional')
+          .eq('agenda_enabled', true)
+          .order('name')
         
-        if (isUserOwner) {
-          // SE É DONO: Buscar todos os profissionais ativos do salão
-          console.log('NovoAgendamento - Usuário é dono, buscando profissionais ativos do salão')
-          
-          // Buscar profissionais ativos vinculados ao salão
-          const { data: salonProfessionals, error: salonError } = await supabase
-            .from('salon_professionals')
-            .select(`
-              professional_id,
-              professional:users!salon_professionals_professional_id_fkey(
-                id,
-                name,
-                email,
-                profile_photo,
-                user_type,
-                agenda_enabled
-              )
-            `)
-            .eq('salon_id', userSalon.id)
-            .eq('status', 'accepted')
-            .eq('professional.agenda_enabled', true) // ✅ Filtrar apenas com agenda ativa
-        
-          if (salonError) {
-            console.error('Erro ao carregar profissionais do salão:', salonError)
-            return
-          }
-          
-          // Processar dados dos profissionais
-          let profissionaisData = salonProfessionals
-            ?.filter(item => item.professional)
-            .map(item => item.professional)
-            .filter(Boolean) || []
-          
-          // Adicionar o dono do salão se ele for profissional e tiver agenda ativa
-          if (userSalon.owner && userSalon.owner.user_type === 'profissional') {
-            const ownerExists = profissionaisData.some((prof: any) => prof.id === userSalon.owner_id)
-            if (!ownerExists) {
-              // Verificar se o dono tem agenda ativa
-              const { data: ownerData } = await supabase
-                .from('users')
-                .select('id, name, email, profile_photo, user_type, agenda_enabled')
-                .eq('id', userSalon.owner_id)
-                .eq('agenda_enabled', true)
-                .single()
-              
-              if (ownerData) {
-                profissionaisData.push(ownerData as any)
-              }
-            }
-          }
-          
-          setProfissionais(profissionaisData)
-          console.log('NovoAgendamento - Profissionais ativos carregados:', profissionaisData.length)
-          
-        } else {
-          // SE NÃO É DONO: Só pode ver a si mesmo (se tiver agenda ativa)
-          console.log('NovoAgendamento - Usuário não é dono, verificando se tem agenda ativa')
-          
-          if (user && user.user_type === 'profissional') {
-            // Verificar se o usuário tem agenda ativa
-            const { data: userData } = await supabase
-              .from('users')
-              .select('id, name, email, profile_photo, user_type, agenda_enabled')
-              .eq('id', user.id)
-              .eq('agenda_enabled', true)
-              .single()
-            
-            setProfissionais(userData ? [userData as any] : [])
-            console.log('NovoAgendamento - Usuário tem agenda ativa:', !!userData)
-          } else {
-            setProfissionais([])
-          }
+        if (error) {
+          console.error('Erro ao carregar profissionais:', error)
+          return
         }
+        
+        setProfissionais(profissionaisData || [])
+        console.log('NovoAgendamento - Profissionais com agenda ativa carregados:', profissionaisData?.length || 0)
         
       } catch (error) {
         console.error('Erro ao carregar profissionais:', error)
@@ -269,7 +206,7 @@ const NovoAgendamento = () => {
     }
     
     fetchProfissionais()
-  }, [userSalon?.id, user?.user_type])
+  }, [user?.id])
 
   // Fechar dropdown quando clicar fora
   useEffect(() => {
@@ -420,7 +357,24 @@ const NovoAgendamento = () => {
       return
     }
 
-    if (!clienteSelecionado?.id) {
+    // Encontrar cliente por nome se não foi selecionado do dropdown
+    let clienteFinal = clienteSelecionado
+    
+    if (!clienteFinal && formData.cliente.trim()) {
+      // Tentar encontrar por nome exato primeiro
+      clienteFinal = clientes.find(c => 
+        c.name.toLowerCase() === formData.cliente.toLowerCase()
+      )
+      
+      // Se não encontrar, tentar por nome parcial
+      if (!clienteFinal) {
+        clienteFinal = clientes.find(c => 
+          c.name.toLowerCase().includes(formData.cliente.toLowerCase())
+        )
+      }
+    }
+    
+    if (!clienteFinal?.id) {
       setErrors(prev => ({ ...prev, cliente: 'Selecione um cliente válido' }))
       return
     }
@@ -488,14 +442,14 @@ const confirmAppointment = async () => {
 
     // Preparar dados do agendamento
     const appointmentData = {
-      salon_id: userSalon.id,
-      client_id: clienteSelecionado.id,
+      salon_id: null, // Profissionais independentes não têm salon_id
+      client_id: clienteFinal.id,
       professional_id: formData.profissional || user?.id || '', // Usar profissional selecionado ou usuário atual
       service_id: servicoSelecionado.id,
       date: dataLocalFormatada, // Usar a data corrigida
       start_time: selectedTimeSlot,
       end_time: endTimeString,
-              duration_minutes: servicoSelecionado.duration_minutes,
+      duration_minutes: servicoSelecionado.duration_minutes,
       price: servicoSelecionado.price,
       status: initialStatus, // Status baseado no tipo de usuário
       notes: formData.observacoes || undefined
@@ -519,7 +473,7 @@ const confirmAppointment = async () => {
     })
     
     // Verificar se todos os dados obrigatórios estão presentes
-    const requiredFields = ['client_id', 'professional_id', 'service_id', 'salon_id', 'date', 'start_time', 'end_time']
+    const requiredFields = ['client_id', 'professional_id', 'service_id', 'date', 'start_time', 'end_time']
     const missingFields = requiredFields.filter(field => !appointmentData[field])
     
     if (missingFields.length > 0) {
@@ -606,24 +560,18 @@ const confirmAppointment = async () => {
 
   console.log('NovoAgendamento - Renderizando...')
 
-  // Verificar se o usuário tem um salão
-  console.log('NovoAgendamento - Verificando salão:', { 
-    userSalon: userSalon, 
-    hasId: !!userSalon?.id,
-    salonId: userSalon?.id 
+  // Verificar se o usuário tem agenda ativa
+  console.log('NovoAgendamento - Verificando agenda:', { 
+    user: user?.id, 
+    userType: user?.user_type,
+    agendaEnabled: user?.agenda_enabled 
   })
   
   // Verificar se o usuário pode criar agendamentos
   const canCreateAppointments = () => {
-    // Se tem salão, pode criar agendamentos
-    if (userSalon?.id) {
+    // Se é profissional com agenda ativa, pode criar agendamentos
+    if (user?.user_type === 'profissional' && user?.agenda_enabled) {
       return true
-    }
-    
-    // Se é profissional independente, verificar se tem agenda trial ativa
-    if (user?.user_type === 'profissional' && !userSalon?.id) {
-      // Verificar se tem agenda trial ativa
-      return (user as any)?.agenda_enabled === true
     }
     
     return false
@@ -878,10 +826,7 @@ const confirmAppointment = async () => {
                           <p className="font-medium">Nenhum serviço cadastrado</p>
                         </div>
                         <p className="text-sm text-muted-foreground mb-3">
-                          {userSalon?.owner_id === user?.id 
-                            ? 'Você precisa cadastrar serviços antes de criar agendamentos.'
-                            : 'Você precisa cadastrar seus serviços antes de criar agendamentos.'
-                          }
+                          Você precisa cadastrar seus serviços antes de criar agendamentos.
                         </p>
                         <Button 
                           variant="outline" 
@@ -926,7 +871,7 @@ const confirmAppointment = async () => {
               {formData.data && formData.servico && formData.profissional ? (
                 <TimeSlotSelector
                   professionalId={formData.profissional}
-                  salonId={userSalon?.id || ''}
+                  salonId={null} // Profissionais independentes não têm salon_id
                   selectedDate={formData.data}
                   serviceDuration={servicos.find(s => s.name === formData.servico)?.duration_minutes || 60}
                   onTimeSlotSelect={setSelectedTimeSlot}

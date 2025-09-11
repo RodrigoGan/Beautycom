@@ -5,7 +5,7 @@ import { compressImage } from '@/utils/compression'
 export interface ProfessionalService {
   id?: string
   professional_id: string
-  salon_id: string
+  salon_id: string | null
   name: string
   description?: string
   duration_minutes: number
@@ -41,7 +41,7 @@ export const useProfessionalServices = (professionalId?: string, salonId?: strin
 
   // Carregar serviços
   const loadServices = useCallback(async () => {
-    if (!professionalId || !salonId) {
+    if (!professionalId) {
       setLoading(false)
       return
     }
@@ -50,12 +50,20 @@ export const useProfessionalServices = (professionalId?: string, salonId?: strin
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('professional_services')
         .select('*')
         .eq('professional_id', professionalId)
-        .eq('salon_id', salonId)
         .order('name', { ascending: true })
+
+      // Se salonId for fornecido, filtrar por ele; senão, buscar serviços independentes
+      if (salonId) {
+        query = query.eq('salon_id', salonId)
+      } else {
+        query = query.is('salon_id', null)
+      }
+
+      const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
@@ -256,9 +264,9 @@ export const useProfessionalServices = (professionalId?: string, salonId?: strin
     console.log('🏢 Salon ID:', salonId)
     console.log('📋 FormData:', formData)
     
-    if (!professionalId || !salonId) {
-      console.error('❌ IDs não fornecidos')
-      throw new Error('ID do profissional ou salão não fornecido')
+    if (!professionalId) {
+      console.error('❌ ID do profissional não fornecido')
+      throw new Error('ID do profissional não fornecido')
     }
 
     try {
@@ -268,7 +276,7 @@ export const useProfessionalServices = (professionalId?: string, salonId?: strin
 
       const serviceData: Omit<ProfessionalService, 'id' | 'created_at' | 'updated_at'> = {
         professional_id: professionalId,
-        salon_id: salonId,
+        salon_id: salonId || null, // Permitir null para profissionais independentes
         name: formData.name,
         description: formData.description,
         duration_minutes: formData.duration_minutes,
