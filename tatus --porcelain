@@ -1,0 +1,213 @@
+warning: in the working copy of 'src/hooks/useUsers.ts', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/hooks/useUsers.ts b/src/hooks/useUsers.ts[m
+[1mindex 75641d5..0ae924a 100644[m
+[1m--- a/src/hooks/useUsers.ts[m
+[1m+++ b/src/hooks/useUsers.ts[m
+[36m@@ -68,10 +68,13 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+ [m
+   const fetchUsers = useCallback(async (filters: UserFilters = {}, resetPage = false) => {[m
+     // Iniciando busca de usuários e salões[m
+[32m+[m[32m    console.log('🚀 fetchUsers chamado com:', { filters, resetPage, currentOffset, usersLength: users.length })[m
+     [m
+     setLoading(true)[m
+     setError(null)[m
+[31m-    setCurrentOffset(0)[m
+[32m+[m[32m    if (resetPage) {[m
+[32m+[m[32m      setCurrentOffset(0)[m
+[32m+[m[32m    }[m
+     [m
+     // Função para executar query com timeout[m
+     const executeQueryWithTimeout = async (queryFn: () => Promise<any>, timeoutMs: number = 5000) => {[m
+[36m@@ -162,25 +165,35 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+       // Construindo queries[m
+       [m
+       // Buscar usuários[m
+[32m+[m[32m      const startOffset = resetPage ? 0 : currentOffset[m
+[32m+[m[32m      console.log('🔍 Construindo query de usuários:')[m
+[32m+[m[32m      console.log('  - startOffset:', startOffset)[m
+[32m+[m[32m      console.log('  - range:', startOffset, 'to', startOffset + 11)[m
+[32m+[m[41m      [m
+       let usersQuery = supabase[m
+         .from('users')[m
+         .select('*', { count: 'exact' })[m
+         .order('created_at', { ascending: false })[m
+[31m-        .range(0, 20) // Aumentar range para garantir que o Rodrigo apareça[m
+[32m+[m[32m        .range(startOffset, startOffset + 11)[m
+ [m
+       // Query de usuários base construída[m
+ [m
+       // Aplicar filtro por tipo de usuário[m
+[32m+[m[32m      console.log('🔍 Filtros aplicados:')[m
+[32m+[m[32m      console.log('  - userType:', filters.userType)[m
+[32m+[m[41m      [m
+       if (filters.userType && filters.userType !== 'all') {[m
+         if (filters.userType === 'profissional') {[m
+           usersQuery = usersQuery.eq('user_type', 'profissional')[m
+[32m+[m[32m          console.log('  - Aplicado filtro: user_type = profissional')[m
+         } else if (filters.userType === 'usuario') {[m
+           usersQuery = usersQuery.eq('user_type', 'usuario')[m
+[32m+[m[32m          console.log('  - Aplicado filtro: user_type = usuario')[m
+         }[m
+       } else {[m
+[31m-        // Se não há filtro específico, buscar apenas profissionais por padrão[m
+[31m-        usersQuery = usersQuery.eq('user_type', 'profissional')[m
+[32m+[m[32m        console.log('  - Sem filtro de tipo (carregando todos)')[m
+       }[m
+[32m+[m[32m      // Removido: não filtrar por padrão para carregar todos os tipos de usuários[m
+ [m
+       // Aplicar filtro de busca para usuários[m
+       if (filters.search && filters.search.trim()) {[m
+[36m@@ -213,7 +226,7 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+             owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)[m
+           `, { count: 'exact' })[m
+           .order('created_at', { ascending: false })[m
+[31m-          .range(0, 11)[m
+[32m+[m[32m          .range(startOffset, startOffset + 11)[m
+ [m
+         // Aplicar filtro de busca para salões[m
+         if (filters.search && filters.search.trim()) {[m
+[36m@@ -235,9 +248,20 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+       const startTime = Date.now()[m
+       [m
+       // Executar queries em paralelo[m
+[32m+[m[32m      console.log('🚀 Executando queries...')[m
+       const [usersResult, salonsResult] = await Promise.all([[m
+[31m-        retryWithBackoff(async () => await usersQuery),[m
+[31m-        salonsQuery ? retryWithBackoff(async () => await salonsQuery) : Promise.resolve({ data: [], error: null, count: 0 })[m
+[32m+[m[32m        retryWithBackoff(async () => {[m
+[32m+[m[32m          console.log('🔍 Executando query de usuários...')[m
+[32m+[m[32m          const result = await usersQuery[m
+[32m+[m[32m          console.log('✅ Query de usuários executada:', result)[m
+[32m+[m[32m          return result[m
+[32m+[m[32m        }),[m
+[32m+[m[32m        salonsQuery ? retryWithBackoff(async () => {[m
+[32m+[m[32m          console.log('🔍 Executando query de salões...')[m
+[32m+[m[32m          const result = await salonsQuery[m
+[32m+[m[32m          console.log('✅ Query de salões executada:', result)[m
+[32m+[m[32m          return result[m
+[32m+[m[32m        }) : Promise.resolve({ data: [], error: null, count: 0 })[m
+       ])[m
+       [m
+       const endTime = Date.now()[m
+[36m@@ -248,7 +272,6 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+ [m
+       [m
+ [m
+[31m-[m
+       if (usersResult.error) {[m
+         console.error('❌ Erro ao buscar usuários:', usersResult.error)[m
+         console.error('❌ Código do erro:', usersResult.error.code)[m
+[36m@@ -286,18 +309,38 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+ [m
+       if (usersResult.data) {[m
+         // Dados de usuários recebidos com sucesso[m
+[32m+[m[32m        console.log('✅ Dados de usuários recebidos com sucesso!')[m
+[32m+[m[32m        console.log('📊 Total de usuários:', usersResult.data.length)[m
+[32m+[m[32m        console.log('🔢 Count total:', usersResult.count || 0)[m
+[32m+[m[32m        console.log('🔍 Query range:', startOffset, 'to', startOffset + 11)[m
+[32m+[m[32m        console.log('🔍 Reset page:', resetPage)[m
+[32m+[m[32m        console.log('🔍 Current users length:', users.length)[m
+         [m
+         if (usersResult.data.length > 0) {[m
+           console.log('✅ Primeiro usuário:', usersResult.data[0])[m
+           console.log('✅ Último usuário:', usersResult.data[usersResult.data.length - 1])[m
+[32m+[m[32m          console.log('🔍 IDs dos usuários retornados:', usersResult.data.map(u => u.id))[m
+         }[m
+         [m
+         const dbUsers = usersResult.data as User[][m
+[31m-        setUsers(dbUsers)[m
+[32m+[m[32m        if (resetPage) {[m
+[32m+[m[32m          setUsers(dbUsers)[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m          setUsers(prev => [...prev, ...dbUsers])[m
+[32m+[m[32m        }[m
+         setTotalCount(usersResult.count || 0)[m
+[31m-        setHasMore((usersResult.count || 0) > dbUsers.length)[m
+[31m-        setCurrentOffset(dbUsers.length)[m
+[32m+[m[32m        const totalUsers = usersResult.count || 0[m
+[32m+[m[32m        const currentTotal = resetPage ? dbUsers.length : users.length + dbUsers.length[m
+[32m+[m[32m        const hasMoreUsers = totalUsers > currentTotal[m
+[32m+[m[32m        setHasMore(hasMoreUsers)[m
+[32m+[m[32m        setCurrentOffset(resetPage ? dbUsers.length : currentOffset + dbUsers.length)[m
+         [m
+[32m+[m[32m        console.log('📊 Debug Paginação:')[m
+[32m+[m[32m        console.log('  - Total de usuários no DB:', totalUsers)[m
+[32m+[m[32m        console.log('  - Usuários carregados agora:', dbUsers.length)[m
+[32m+[m[32m        console.log('  - Total acumulado:', currentTotal)[m
+[32m+[m[32m        console.log('  - HasMore:', hasMoreUsers)[m
+[32m+[m[32m        console.log('  - CurrentOffset:', resetPage ? dbUsers.length : currentOffset + dbUsers.length)[m
+         console.log('✅ Estado atualizado com sucesso!')[m
+       } else {[m
+         console.log('⚠️ Nenhum dado de usuários recebido')[m
+[36m@@ -318,10 +361,14 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+         }[m
+         [m
+         const dbSalons = salonsResult.data as SalonStudio[][m
+[31m-        setSalons(dbSalons)[m
+[32m+[m[32m        if (resetPage) {[m
+[32m+[m[32m          setSalons(dbSalons)[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m          setSalons(prev => [...prev, ...dbSalons])[m
+[32m+[m[32m        }[m
+         // setTotalCount(salonsResult.count || 0) // Total de salões não é retornado pela query, então não atualiza[m
+[31m-        setHasMore((salonsResult.count || 0) > dbSalons.length)[m
+[31m-        setCurrentOffset(dbSalons.length)[m
+[32m+[m[32m        // Não sobrescrever hasMore aqui - já foi definido pela lógica de usuários[m
+[32m+[m[32m        setCurrentOffset(resetPage ? dbSalons.length : currentOffset + dbSalons.length)[m
+         [m
+         console.log('✅ Estado atualizado com sucesso!')[m
+       } else {[m
+[36m@@ -370,7 +417,7 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+         .from('users')[m
+         .select('*')[m
+         .order('created_at', { ascending: false })[m
+[31m-        .range(currentOffset, currentOffset + 11)[m
+[32m+[m[32m        .range(users.length, users.length + 11)[m
+ [m
+       // Aplicar filtros atuais[m
+       if (filters.userType && filters.userType !== 'all') {[m
+[36m@@ -425,7 +472,7 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+             owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)[m
+           `)[m
+           .order('created_at', { ascending: false })[m
+[31m-          .range(currentOffset, currentOffset + 11)[m
+[32m+[m[32m          .range(salons.length, salons.length + 11)[m
+ [m
+         if (filters.search && filters.search.trim()) {[m
+           const searchTerm = filters.search.trim()[m
+[36m@@ -450,10 +497,10 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+           const newSalons = salonsData as SalonStudio[][m
+           setSalons(prev => [...prev, ...newSalons])[m
+           setCurrentOffset(prev => prev + newSalons.length)[m
+[31m-          setHasMore(newSalons.length === 12) // Se recebeu menos que 12, não há mais[m
+[32m+[m[32m          // Não alterar hasMore aqui - deve ser baseado nos usuários[m
+         } else {[m
+           console.log('⚠️ Nenhum salão adicional encontrado')[m
+[31m-          setHasMore(false)[m
+[32m+[m[32m          // Não alterar hasMore aqui - deve ser baseado nos usuários[m
+         }[m
+       }[m
+     } catch (err) {[m
+[36m@@ -462,17 +509,19 @@[m [mexport function useUsers(filters: UserFilters = {}) {[m
+     } finally {[m
+       setLoading(false)[m
+     }[m
+[31m-  }, [loading, hasMore, currentOffset, filters])[m
+[32m+[m[32m  }, [loading, hasMore, users.length, salons.length, filters])[m
+ [m
+   const refetch = useCallback(() => {[m
+     return fetchUsers(filters, true)[m
+[31m-  }, [fetchUsers, filters])[m
+[32m+[m[32m  }, [filters])[m
+ [m
+   // Buscar usuários quando os filtros mudarem[m
+   useEffect(() => {[m
+     console.log('🔄 Filtros mudaram, buscando usuários...')[m
+[32m+[m[32m    console.log('🔍 Filtros atuais:', filters)[m
+[32m+[m[32m    console.log('🔍 fetchUsers disponível:', !!fetchUsers)[m
+     fetchUsers(filters, true)[m
+[31m-  }, [filters, fetchUsers])[m
+[32m+[m[32m  }, [filters])[m
+ [m
+   return {[m
+     users,[m
