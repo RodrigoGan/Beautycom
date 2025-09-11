@@ -63,7 +63,7 @@ const NewPostModal = ({
     { value: "Tatuagem", label: "🎨 Tatuagem" },
     { value: "Piercing", label: "💎 Piercing" },
     { value: "Maquiagem", label: "💄 Maquiagem" },
-    { value: "Sobrancelhas/Cílios", label: "👁️ Sobrancelhas/Cílios" }
+    { value: "Sobrancelhas / Cílios", label: "👁️ Sobrancelhas / Cílios" }
   ]
 
   const handleInputChange = (field: string, value: string) => {

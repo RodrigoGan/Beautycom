@@ -17,6 +17,7 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
 import { TimeSlotSelector } from "@/components/TimeSlotSelector"
+import { translateError } from "@/utils/errorTranslations"
 import {
   Dialog,
   DialogContent,
@@ -509,10 +510,11 @@ const confirmAppointment = async () => {
 
     if (result.error) {
       console.error('❌ NovoAgendamento - Erro retornado:', result.error)
-      setErrors(prev => ({ ...prev, general: result.error }))
+      const translatedError = translateError(result.error)
+      setErrors(prev => ({ ...prev, general: translatedError }))
       toast({
         title: 'Erro ao criar agendamento',
-        description: result.error,
+        description: translatedError,
         variant: 'destructive'
       })
       return
@@ -543,22 +545,7 @@ const confirmAppointment = async () => {
     let errorMessage = 'Erro ao criar agendamento. Tente novamente.'
     
     if (error instanceof Error) {
-      errorMessage = error.message
-      
-      // Tratamento específico para erros de limite
-      if (error.message.includes('limit') || error.message.includes('rate') || error.message.includes('quota')) {
-        errorMessage = 'Limite de uso do Supabase excedido. Tente novamente em alguns minutos.'
-      }
-      
-      // Tratamento específico para erros de permissão
-      if (error.message.includes('permission') || error.message.includes('policy')) {
-        errorMessage = 'Erro de permissão. Verifique se você tem acesso para criar agendamentos.'
-      }
-      
-      // Tratamento específico para erros de foreign key
-      if (error.message.includes('foreign key') || error.message.includes('constraint')) {
-        errorMessage = 'Dados inválidos. Verifique se o cliente e serviço selecionados existem.'
-      }
+      errorMessage = translateError(error.message)
     }
     
     setErrors(prev => ({ 

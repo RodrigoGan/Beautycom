@@ -222,7 +222,7 @@ export const usePosts = () => {
           
           // Log específico para "Sobrancelhas / Cílios"
           if (filtersToUse.category === 'Sobrancelhas / Cílios') {
-            console.log('🔍 DEBUG: Aplicando filtro para Sobrancelhas/Cílios com ID:', categoryData.id)
+            console.log('🔍 DEBUG: Aplicando filtro para Sobrancelhas / Cílios com ID:', categoryData.id)
           }
           
           query = query.eq('category_id', categoryData.id)

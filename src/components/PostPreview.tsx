@@ -292,7 +292,7 @@ const PostPreview = ({ postData, isMobile = false }: PostPreviewProps) => {
       'Tatuagem': '🎨',
       'Piercing': '💎',
       'Maquiagem': '💄',
-      'Sobrancelhas/Cílios': '👁️'
+      'Sobrancelhas / Cílios': '👁️'
     }
     return categoryIcons[postData.category] || '📝'
   }

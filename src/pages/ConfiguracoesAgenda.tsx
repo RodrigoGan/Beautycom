@@ -19,6 +19,7 @@ import { useAgendaStatus } from "@/hooks/useAgendaStatus"
 import { useToast } from "@/hooks/use-toast"
 import { useEffect, useState } from "react"
 import { compressImage } from "@/utils/compression"
+import { translateError } from "@/utils/errorTranslations"
 import { AgendaActivationCard } from "@/components/AgendaActivationCard"
 
 const ConfiguracoesAgenda = () => {
@@ -314,29 +315,9 @@ const ConfiguracoesAgenda = () => {
       let errorMessage = "Erro ao salvar serviço"
       
       if (error instanceof Error) {
-        errorMessage = error.message
+        errorMessage = translateError(error.message)
         console.error('❌ Tipo do erro:', error.constructor.name)
         console.error('❌ Stack trace:', error.stack)
-        
-        // Tratamento específico para erros de upload
-        if (error.message.includes('upload') || error.message.includes('storage')) {
-          errorMessage = "Erro no upload da foto. Verifique se o arquivo é uma imagem válida."
-        }
-        
-        // Tratamento específico para erros de limite do Supabase
-        if (error.message.includes('limit') || error.message.includes('rate') || error.message.includes('quota')) {
-          errorMessage = "Limite de uso do Supabase excedido. Tente novamente em alguns minutos ou faça upgrade do plano."
-        }
-        
-        // Tratamento específico para erros de permissão
-        if (error.message.includes('permission') || error.message.includes('policy')) {
-          errorMessage = "Erro de permissão. Verifique se você tem acesso para criar serviços."
-        }
-        
-        // Tratamento específico para erros de categoria
-        if (error.message.includes('category') || error.message.includes('categoria')) {
-          errorMessage = "Por favor, selecione uma categoria válida."
-        }
       }
       
       toast({
@@ -364,7 +345,7 @@ const ConfiguracoesAgenda = () => {
         console.error('Erro ao deletar serviço:', error)
         toast({
           title: "Erro",
-          description: error instanceof Error ? error.message : "Erro ao deletar serviço",
+          description: error instanceof Error ? translateError(error.message) : "Erro ao deletar serviço",
           variant: "destructive"
         })
       }
@@ -513,7 +494,7 @@ const ConfiguracoesAgenda = () => {
       console.error('Erro ao salvar configurações:', error)
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao salvar configurações",
+        description: error instanceof Error ? translateError(error.message) : "Erro ao salvar configurações",
         variant: "destructive"
       })
     }

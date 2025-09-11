@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+import { translateError } from '@/utils/errorTranslations'
 import { User } from '@/lib/supabase'
 
 // Cache local para reduzir chamadas ao Supabase
@@ -217,15 +218,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       let errorMessage = "Credenciais inválidas"
       
       if (error instanceof Error) {
-        if (error.message.includes("Email not confirmed")) {
-          errorMessage = "Email não confirmado. Verifique sua caixa de entrada."
-        } else if (error.message.includes("Invalid login credentials")) {
-          errorMessage = "Email ou senha incorretos"
-        } else if (error.message.includes("fetch")) {
-          errorMessage = "Erro de conexão. Verifique sua internet e tente novamente."
-        } else {
-          errorMessage = error.message
-        }
+        errorMessage = translateError(error.message)
       }
 
       toast({
@@ -262,7 +255,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       toast({
         title: "Erro no cadastro",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
+        description: error instanceof Error ? translateError(error.message) : "Erro desconhecido",
         variant: "destructive"
       })
       
@@ -289,7 +282,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Erro no logout:', error)
       toast({
         title: "Erro no logout",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
+        description: error instanceof Error ? translateError(error.message) : "Erro desconhecido",
         variant: "destructive"
       })
     }
@@ -354,7 +347,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('❌ Erro ao atualizar usuário:', error)
       toast({
         title: "Erro ao atualizar perfil",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
+        description: error instanceof Error ? translateError(error.message) : "Erro desconhecido",
         variant: "destructive"
       })
     }

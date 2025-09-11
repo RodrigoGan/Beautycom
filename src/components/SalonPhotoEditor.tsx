@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useStorage } from "@/hooks/useStorage"
 import { supabase } from "@/lib/supabase"
 import { Loader2, Upload, X, Camera, Image as ImageIcon } from "lucide-react"
 
@@ -21,6 +22,7 @@ interface SalonPhotoEditorProps {
 
 const SalonPhotoEditor = ({ isOpen, onClose, salon, onPhotoUpdated }: SalonPhotoEditorProps) => {
   const { toast } = useToast()
+  const { uploadProfilePhoto, uploadCoverPhoto } = useStorage()
   const [loading, setLoading] = useState(false)
   const [uploadingProfile, setUploadingProfile] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
@@ -45,28 +47,6 @@ const SalonPhotoEditor = ({ isOpen, onClose, salon, onPhotoUpdated }: SalonPhoto
     const file = event.target.files?.[0]
     if (!file || !salon?.id) return
 
-    // Validar tipo de arquivo
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-    if (!validTypes.includes(file.type)) {
-      toast({
-        title: "Tipo de arquivo inválido",
-        description: "Por favor, selecione uma imagem (JPG, PNG ou WebP).",
-        variant: "destructive"
-      })
-      return
-    }
-
-    // Validar tamanho (máximo 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    if (file.size > maxSize) {
-      toast({
-        title: "Arquivo muito grande",
-        description: "Por favor, selecione uma imagem menor que 5MB.",
-        variant: "destructive"
-      })
-      return
-    }
-
     setLoading(true)
     if (type === 'profile') {
       setUploadingProfile(true)
@@ -75,30 +55,19 @@ const SalonPhotoEditor = ({ isOpen, onClose, salon, onPhotoUpdated }: SalonPhoto
     }
 
     try {
-      // Determinar bucket e caminho
-      const bucket = type === 'profile' ? 'profile-photos' : 'cover-photos'
-      const fileExtension = file.name.split('.').pop()
-      const fileName = `${salon.id}/${type}_${Date.now()}.${fileExtension}`
+      // ✅ USAR MÉTODO PADRONIZADO COM COMPRESSÃO
+      let photoUrl: string | null = null
       
-      // Upload do arquivo
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        })
-
-      if (uploadError) {
-        throw uploadError
+      if (type === 'profile') {
+        // Usar uploadProfilePhoto com compressão otimizada
+        photoUrl = await uploadProfilePhoto(file, salon.id)
+      } else {
+        // Usar uploadCoverPhoto com compressão otimizada
+        photoUrl = await uploadCoverPhoto(file, salon.id)
       }
 
-      // Obter URL pública
-      const { data: urlData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(fileName)
-
-      if (!urlData.publicUrl) {
-        throw new Error('Erro ao gerar URL pública')
+      if (!photoUrl) {
+        throw new Error('Erro ao fazer upload da foto')
       }
 
       // Atualizar salão no banco
@@ -106,7 +75,7 @@ const SalonPhotoEditor = ({ isOpen, onClose, salon, onPhotoUpdated }: SalonPhoto
       const { error: updateError } = await supabase
         .from('salons_studios')
         .update({
-          [updateField]: urlData.publicUrl,
+          [updateField]: photoUrl,
           updated_at: new Date().toISOString()
         })
         .eq('id', salon.id)
@@ -145,7 +114,6 @@ const SalonPhotoEditor = ({ isOpen, onClose, salon, onPhotoUpdated }: SalonPhoto
   // Função para gerar URL com cache busting
   const getImageUrl = (url: string) => {
     if (!url) return ''
-    console.log('Gerando URL para imagem:', url)
     return `${url}?v=${Date.now()}`
   }
 

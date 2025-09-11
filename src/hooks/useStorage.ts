@@ -104,10 +104,11 @@ export function useStorage() {
       switch (bucket) {
         case 'fotoperfil':
           compressedFile = await compressImage(file, { 
-            maxWidth: 400, 
-            maxHeight: 400, 
-            quality: 0.8 
-          }) // Foto pequena quadrada
+            maxWidth: 200, 
+            maxHeight: 200, 
+            quality: 0.6,
+            format: 'webp'
+          }) // Foto pequena otimizada
           break
         case 'fotopost':
           compressedFile = await compressImage(file, { 

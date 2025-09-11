@@ -117,7 +117,7 @@ const Membros = () => {
                   'tatuagem': 'Tatuagem',
                   'piercing': 'Piercing',
                   'maquiagem': 'Maquiagem',
-                  'sobrancelhas': 'Sobrancelhas/Cílios'
+                  'sobrancelhas': 'Sobrancelhas / Cílios'
                 }
                 return c.name === mapping[habilidadeFiltro]
               })?.id : undefined

@@ -296,10 +296,10 @@ export const formatFileSize = (bytes: number): string => {
 export const COMPRESSION_CONFIGS = {
   // Imagens
   profile: {
-    maxWidth: 400,
-    maxHeight: 400,
-    quality: 0.8,
-    maxSizeMB: 2
+    maxWidth: 200,
+    maxHeight: 200,
+    quality: 0.6,
+    maxSizeMB: 1
   },
   post: {
     maxWidth: isMobile() ? 1200 : 1600,

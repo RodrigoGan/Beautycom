@@ -9,7 +9,7 @@ export const BEAUTY_CATEGORIES = [
   "Tatuagem",
   "Piercing",
   "Maquiagem",
-  "Sobrancelhas/Cílios"
+  "Sobrancelhas / Cílios"
 ] as const
 
 export type BeautyCategory = typeof BEAUTY_CATEGORIES[number]
@@ -25,5 +25,5 @@ export const CATEGORY_ICONS: Record<BeautyCategory, string> = {
   "Tatuagem": "🎨",
   "Piercing": "💎",
   "Maquiagem": "💄",
-  "Sobrancelhas/Cílios": "👁️"
+  "Sobrancelhas / Cílios": "👁️"
 } 

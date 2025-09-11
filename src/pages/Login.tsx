@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
+import { translateError } from "@/utils/errorTranslations"
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -72,15 +73,7 @@ const Login = () => {
       let errorMessage = "Erro ao fazer login. Tente novamente."
       
       if (error instanceof Error) {
-        if (error.message.includes("Timeout")) {
-          errorMessage = "Servidor sobrecarregado. Tente novamente em alguns minutos."
-        } else if (error.message.includes("fetch")) {
-          errorMessage = "Erro de conexão. Verifique sua internet e tente novamente."
-        } else if (error.message.includes("Invalid login credentials")) {
-          errorMessage = "Email ou senha incorretos."
-        } else {
-          errorMessage = error.message
-        }
+        errorMessage = translateError(error.message)
       }
       
       setError(errorMessage)

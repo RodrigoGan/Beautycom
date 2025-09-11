@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SelectionChips } from "@/components/ui/selection-chips"
-import { Eye, EyeOff, ArrowLeft, ArrowRight, Sparkles, Users, Star, Heart, Calendar, CheckCircle, User, MoreVertical, Camera, Upload, X, Loader2 } from "lucide-react"
+import { Eye, EyeOff, ArrowLeft, ArrowRight, Sparkles, Users, Star, Heart, Calendar, CheckCircle, User, MoreVertical, Camera, Upload, Loader2 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { BEAUTY_CATEGORIES } from "@/lib/constants"
@@ -87,14 +87,14 @@ const Cadastro = () => {
       newErrors.nome = "Nome deve ter pelo menos 3 caracteres"
     }
     
-    // Validar nickname
-    if (!formData.nickname.trim()) {
-      newErrors.nickname = "Nickname é obrigatório"
-    } else if (formData.nickname.trim().length < 3) {
-      newErrors.nickname = "Nickname deve ter pelo menos 3 caracteres"
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.nickname.trim())) {
-      newErrors.nickname = "Nickname deve conter apenas letras, números e underscore"
-    }
+  // Validar nickname
+  if (!formData.nickname.trim()) {
+    newErrors.nickname = "Nickname é obrigatório"
+  } else if (formData.nickname.trim().length < 3) {
+    newErrors.nickname = "Nickname deve ter pelo menos 3 caracteres"
+  } else if (!/^[a-zA-Z0-9._-]+$/.test(formData.nickname.trim())) {
+    newErrors.nickname = "Nickname deve conter apenas letras, números, ponto, hífen e underscore"
+  }
     
     // Validar tipo de usuário
     if (!userType) {
@@ -133,19 +133,42 @@ const Cadastro = () => {
   
   // Função para atualizar dados do formulário
   const handleInputChange = (field: string, value: string) => {
+    // Tratamento especial para nickname
+    if (field === 'nickname') {
+      // Remover @ do início se o usuário digitar
+      if (value.startsWith('@')) {
+        value = value.substring(1)
+        // Mostrar mensagem amigável
+        setErrors(prev => ({ ...prev, [field]: "O @ já está incluído automaticamente! 😊" }))
+        // Limpar mensagem após 2 segundos
+        setTimeout(() => {
+          setErrors(prev => ({ ...prev, [field]: "" }))
+        }, 2000)
+      }
+    }
+    
     setFormData(prev => ({ ...prev, [field]: value }))
+    
     // Limpar erro quando usuário começa a digitar
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
+    }
+    
+    // Validação em tempo real para nickname
+    if (field === 'nickname' && value.trim()) {
+      if (value.trim().length < 3) {
+        setErrors(prev => ({ ...prev, [field]: "Nickname deve ter pelo menos 3 caracteres" }))
+      } else if (!/^[a-zA-Z0-9._-]+$/.test(value.trim())) {
+        setErrors(prev => ({ ...prev, [field]: "Nickname deve conter apenas letras, números, ponto, hífen e underscore" }))
+      } else {
+        // Limpar erro se estiver válido
+        setErrors(prev => ({ ...prev, [field]: "" }))
+      }
     }
   }
   
   // Função para salvar dados da etapa 1
   const saveStep1Data = async () => {
-    if (!validateStep1()) {
-      return false
-    }
-
     setIsSaving(true)
     
     try {
@@ -243,14 +266,6 @@ const Cadastro = () => {
 
       // 5. Salvar ID do usuário para uso nas próximas etapas
       setUserId(userId)
-
-      toast({
-        title: "Cadastro iniciado com sucesso!",
-        description: userType === 'profissional' 
-          ? "Seus dados básicos foram salvos. Você ganhou 30 dias grátis para testar a agenda online! Continue para completar seu perfil."
-          : "Seus dados básicos foram salvos. Continue para completar seu perfil.",
-        variant: "default"
-      })
 
       return true
 
@@ -364,12 +379,6 @@ const Cadastro = () => {
         throw new Error(error.message)
       }
 
-      toast({
-        title: "Endereço salvo!",
-        description: "Seus dados de endereço foram salvos com sucesso.",
-        variant: "default"
-      })
-
       return true
 
     } catch (error) {
@@ -453,6 +462,11 @@ const Cadastro = () => {
 
   const nextStep = async () => {
     if (currentStep === 1) {
+      // ✅ VALIDAR PRIMEIRO, DEPOIS SALVAR
+      if (!validateStep1()) {
+        return // Não prossegue se validação falhar
+      }
+      
       const success = await saveStep1Data()
       if (success) {
         setCurrentStep(prev => prev + 1)
@@ -527,13 +541,6 @@ const Cadastro = () => {
     }
   }
 
-  // Função para remover foto
-  const handleRemovePhoto = () => {
-    setProfilePhoto(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
 
   // Função para formatar número de telefone
   const formatPhoneNumber = (value: string) => {
@@ -700,35 +707,27 @@ const Cadastro = () => {
                   Foto de Perfil
                   <span className="text-red-500">*</span>
                 </Label>
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center space-y-3">
                   <div className="relative photo-upload-area">
                     {profilePhoto ? (
-                      <div className="relative">
-                        <img 
-                          src={profilePhoto} 
-                          alt="Foto de perfil" 
-                          className="w-20 h-20 rounded-full object-cover border-4 border-primary/20 shadow-lg cursor-pointer"
-                          onClick={() => setShowPhotoMenu(!showPhotoMenu)}
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg"
-                          onClick={handleRemovePhoto}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <img 
+                        src={profilePhoto} 
+                        alt="Foto de perfil" 
+                        className="w-20 h-20 rounded-full object-cover border-4 border-primary/20 shadow-lg cursor-pointer hover:border-primary/40 transition-colors"
+                        onClick={() => setShowPhotoMenu(!showPhotoMenu)}
+                      />
                     ) : (
                       <div 
-                        className="w-20 h-20 rounded-full bg-gradient-card border-2 border-dashed border-primary/30 flex items-center justify-center relative group hover:border-primary/50 transition-colors cursor-pointer"
+                        className="w-20 h-20 rounded-full bg-gradient-card border-2 border-dashed border-primary/30 flex items-center justify-center relative group hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer"
                         onClick={() => setShowPhotoMenu(!showPhotoMenu)}
                       >
                         {isUploading ? (
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                         ) : (
-                          <User className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                          <div className="flex flex-col items-center space-y-1">
+                            <User className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <Camera className="h-3 w-3 text-muted-foreground/60 group-hover:text-primary/60 transition-colors" />
+                          </div>
                         )}
                       </div>
                     )}
@@ -759,6 +758,26 @@ const Cadastro = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Texto explicativo */}
+                  {!profilePhoto && (
+                    <div className="text-center space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Clique para adicionar sua foto
+                      </p>
+                      <p className="text-xs text-muted-foreground/70">
+                        Sua foto ajuda outros usuários a te reconhecer
+                      </p>
+                    </div>
+                  )}
+                  
+                  {profilePhoto && (
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Clique na foto para alterar
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <input
@@ -801,14 +820,14 @@ const Cadastro = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="nickname" className="flex items-center gap-1">
-                  Nickname
+                  Nickname (apelido)
                   <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">@</span>
                   <Input 
                     id="nickname" 
-                    placeholder="seunickname" 
+                    placeholder="meu.apelido" 
                     className={`pl-8 ${errors.nickname && touched.nickname ? "border-red-500" : ""}`}
                     value={formData.nickname}
                     onChange={(e) => handleInputChange('nickname', e.target.value)}
@@ -816,12 +835,18 @@ const Cadastro = () => {
                   />
                 </div>
                 {errors.nickname && touched.nickname && (
-                  <p className="text-sm text-red-500 mt-1">{errors.nickname}</p>
+                  <p className={`text-sm mt-1 ${
+                    errors.nickname.includes('😊') 
+                      ? 'text-blue-500' 
+                      : 'text-red-500'
+                  }`}>
+                    {errors.nickname}
+                  </p>
                 )}
               </div>
               <div className="space-y-3">
                 <Label className="flex items-center gap-1">
-                  Tipo de Usuário
+                  Escolha seu Tipo de Usuário
                   <span className="text-red-500">*</span>
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
@@ -1123,7 +1148,7 @@ const Cadastro = () => {
               </div>
 
               <SelectionChips
-                items={BEAUTY_CATEGORIES}
+                items={[...BEAUTY_CATEGORIES]}
                 selectedItems={selectedPreferences}
                 onSelectionChange={setSelectedPreferences}
                 title={userType === "profissional" ? "Habilidades" : "Preferências"}
