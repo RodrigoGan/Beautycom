@@ -15,6 +15,7 @@ import { useSalons } from "@/hooks/useSalons"
 import { useAgendaConfig } from "@/hooks/useAgendaConfig"
 import { useProfessionalServices } from "@/hooks/useProfessionalServices"
 import { useCategories } from "@/hooks/useCategories"
+import { useAgendaStatus } from "@/hooks/useAgendaStatus"
 import { useToast } from "@/hooks/use-toast"
 import { useEffect, useState } from "react"
 import { compressImage } from "@/utils/compression"
@@ -24,17 +25,13 @@ const ConfiguracoesAgenda = () => {
   const { user } = useAuthContext()
   const { userSalon } = useSalons(user?.id)
   
+  // Hook para verificar status da agenda
+  const { hasActiveAgenda, loading: agendaStatusLoading } = useAgendaStatus(user?.id)
+  
   // Lógica de permissões simplificada
-  const isOwner = user?.id === userSalon?.owner_id
-  const isLinkedProfessional = user?.user_type === 'profissional' && userSalon?.id && !isOwner
-  const isTrialUser = user?.user_type === 'profissional' && (user as any)?.agenda_enabled
+  const canManageSettings = user?.user_type === 'profissional' && hasActiveAgenda
   
-  // Profissionais vinculados podem gerenciar suas próprias configurações
-  // Donos podem gerenciar todas as configurações do salão
-  // Usuários trial podem gerenciar suas próprias configurações
-  const canManageSettings = isOwner || isLinkedProfessional || isTrialUser
-  
-  const permissionsLoading = false // REMOVIDO TEMPORARIAMENTE
+  const permissionsLoading = agendaStatusLoading
   
   const { toast } = useToast()
   
@@ -81,7 +78,7 @@ const ConfiguracoesAgenda = () => {
     validateConfig,
     convertWorkingDaysToDB,
     convertWorkingDaysFromDB
-  } = useAgendaConfig(user?.id, userSalon?.id)
+  } = useAgendaConfig(user?.id, null) // Profissionais independentes não têm salon_id
 
   // Hook para categorias
   const {
@@ -102,7 +99,7 @@ const ConfiguracoesAgenda = () => {
     deleteService,
     toggleServiceStatus,
     validateService
-  } = useProfessionalServices(user?.id, userSalon?.id)
+  } = useProfessionalServices(user?.id, null) // Profissionais independentes não têm salon_id
   
   // Estados locais para o formulário
   const [intervaloAlmoco, setIntervaloAlmoco] = useState(true)

@@ -245,8 +245,10 @@ export const SubscriptionSummaryCard: React.FC<SubscriptionSummaryCardProps> = (
             Resumo da Assinatura
             {getStatusBadge()}
           </CardTitle>
-          <CardDescription>
-            {getDescription()}
+          <CardDescription asChild>
+            <div>
+              {getDescription()}
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>

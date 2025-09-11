@@ -18,7 +18,6 @@ export interface SubscriptionInfo {
     max_professionals: number
     price_monthly: number
     price_yearly: number
-    features: string[]
   }
 }
 
@@ -182,6 +181,21 @@ export const useSubscriptionInfo = (userId?: string) => {
         .eq('converted_to_paid', false)
         .single()
 
+      // Se não encontrou trial não convertido, buscar qualquer trial ativo
+      let finalTrialData = trialData
+      if (trialError && trialError.code === 'PGRST116') {
+        const { data: anyTrialData } = await supabase
+          .from('professional_trials')
+          .select('*')
+          .eq('professional_id', targetUserId)
+          .eq('status', 'active')
+          .single()
+        
+        if (anyTrialData) {
+          finalTrialData = anyTrialData
+        }
+      }
+
       console.log('🔍 Resultado da busca de trial (professional_trials):', { trialData, trialError })
 
       // Se não encontrou, verificar se está na tabela appointments (possível confusão)
@@ -231,9 +245,9 @@ export const useSubscriptionInfo = (userId?: string) => {
         throw trialError
       }
 
-      if (trialData) {
+      if (finalTrialData) {
         // Usar UTC para evitar problemas de fuso horário
-        const trialEndDate = new Date(trialData.end_date) // ✅ Corrigido: usar end_date em vez de trial_end_date
+        const trialEndDate = new Date(finalTrialData.end_date)
         const now = new Date()
         
         // Calcular diferença em dias de forma mais precisa
@@ -246,27 +260,54 @@ export const useSubscriptionInfo = (userId?: string) => {
         // Converter para dias (arredondar para baixo para ser mais conservador)
         const daysRemaining = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)))
         
+        const isActive = now <= trialEndDate
+        
         console.log('🔍 Trial Debug:', {
-          trialEndDate: trialData.end_date, // ✅ Corrigido
+          trialEndDate: finalTrialData.end_date,
           trialEndDateObj: trialEndDate,
           trialEndUTC: trialEndUTC,
           now: now,
           nowUTC: nowUTC,
           timeDiff,
           daysRemaining,
-          isActive: now <= trialEndDate
+          isActive
         })
         
         setSubscriptionSummary({
           type: 'trial',
-          status: now <= trialEndDate ? 'active' : 'expired',
+          status: isActive ? 'active' : 'expired',
           planName: 'Trial Gratuito',
           maxProfessionals: 1,
           currentProfessionals: 1,
-          expirationDate: trialData.end_date, // ✅ Corrigido
+          expirationDate: finalTrialData.end_date,
           daysRemaining,
-          isActive: now <= trialEndDate,
-          trialInfo: trialData
+          isActive,
+          trialInfo: finalTrialData
+        })
+        return
+      }
+
+      // 3. Se não tem trial nem assinatura, verificar se tem trial expirado
+      const { data: expiredTrialData } = await supabase
+        .from('professional_trials')
+        .select('*')
+        .eq('professional_id', targetUserId)
+        .eq('status', 'expired')
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (expiredTrialData) {
+        setSubscriptionSummary({
+          type: 'trial',
+          status: 'expired',
+          planName: 'Trial Gratuito (Expirado)',
+          maxProfessionals: 1,
+          currentProfessionals: 0,
+          expirationDate: expiredTrialData.end_date,
+          daysRemaining: 0,
+          isActive: false,
+          trialInfo: expiredTrialData
         })
         return
       }
@@ -282,8 +323,7 @@ export const useSubscriptionInfo = (userId?: string) => {
             description,
             max_professionals,
             price_monthly,
-            price_yearly,
-            features
+            price_yearly
           )
         `)
         .eq('user_id', targetUserId)
