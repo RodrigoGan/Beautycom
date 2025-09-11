@@ -178,19 +178,100 @@ const Membros = () => {
     }
   }, [user, carregando, dbHasMore, loadMoreDbUsers, dbLoading])
 
-  // Trava para evitar loops infinitos
-  const [loopProtection, setLoopProtection] = useState(0)
+  // Proteção de loop removida - estava causando problemas
+
+  // Converter usuários do banco para formato de membros (otimizado)
+  const membrosUsuarios = useMemo(() => {
+    const converted = dbUsers.map(user => converterUsuarioParaMembro(user, getCategoryNames))
+    
+    // Adicionar o usuário logado se ele for profissional e não estiver na lista
+    const usuarioLogadoNaLista = dbUsers.find(u => u.id === user?.id)
+    if (user && !usuarioLogadoNaLista && user.user_type === 'profissional') {
+      // Adicionando usuário logado à lista
+      const membroLogado = converterUsuarioParaMembro(user, getCategoryNames)
+      converted.unshift(membroLogado) // Adicionar no início da lista
+    }
+    
+    return converted
+  }, [dbUsers, user, getCategoryNames])
+  
+  // Converter salões para formato de membros (otimizado)
+  const membrosSalons = useMemo(() => {
+    return tipoMembro === "profissionais" ? 
+      dbSalons.map(salon => converterSalonParaMembro(salon)) : []
+  }, [dbSalons, tipoMembro])
+  
+  // Combinar usuários e salões (removida lógica de proprietários duplicados)
+  const membrosConvertidos = useMemo(() => {
+    return [...membrosUsuarios, ...membrosSalons]
+  }, [membrosUsuarios, membrosSalons])
+  
+  // 🎲 EMBARALHAMENTO INCREMENTAL: Manter ordem dos membros já carregados
+  const [membrosEmbaralhados, setMembrosEmbaralhados] = useState<any[]>([])
+  const [ultimoTamanho, setUltimoTamanho] = useState(0)
+  
   useEffect(() => {
-    if (loopProtection > 10) {
-      console.error('🚨 LOOP INFINITO DETECTADO NA PÁGINA MEMBROS - Parando execução')
+    console.log('🎲 Processando membros...')
+    console.log('  - Total de membros convertidos:', membrosConvertidos.length)
+    console.log('  - Último tamanho:', ultimoTamanho)
+    
+    if (membrosConvertidos.length === 0) {
+      setMembrosEmbaralhados([])
+      setUltimoTamanho(0)
       return
     }
-    setLoopProtection(prev => prev + 1)
-  }, [dbUsers.length, dbSalons.length, membrosExibidos.length])
+    
+    if (membrosConvertidos.length <= ultimoTamanho) {
+      // Se não há novos membros, manter a ordem atual
+      console.log('  - Nenhum membro novo, mantendo ordem atual')
+      return
+    }
+    
+    // Há novos membros - adicionar ao final e embaralhar apenas os novos
+    const novosMembros = membrosConvertidos.slice(ultimoTamanho)
+    console.log('  - Novos membros:', novosMembros.length)
+    console.log('  - IDs dos novos membros:', novosMembros.map(m => m.id))
+    
+    // Remover duplicatas baseado no ID
+    const membrosUnicos = novosMembros.filter((membro, index, array) => 
+      array.findIndex(m => m.id === membro.id) === index
+    )
+    console.log('  - Membros únicos após remoção de duplicatas:', membrosUnicos.length)
+    console.log('  - IDs dos membros únicos:', membrosUnicos.map(m => m.id))
+    
+    // Embaralhar apenas os novos membros únicos
+    const novosEmbaralhados = [...membrosUnicos].sort(() => Math.random() - 0.5)
+    console.log('  - IDs dos novos após embaralhamento:', novosEmbaralhados.map(m => m.id))
+    
+    // Adicionar os novos membros embaralhados ao final da lista existente
+    setMembrosEmbaralhados(prev => {
+      // Remover duplicatas da lista existente também
+      const listaExistenteUnica = prev.filter((membro, index, array) => 
+        array.findIndex(m => m.id === membro.id) === index
+      )
+      
+      // Verificar se os novos membros já existem na lista existente
+      const novosSemDuplicatas = novosEmbaralhados.filter(novoMembro => 
+        !listaExistenteUnica.some(existente => existente.id === novoMembro.id)
+      )
+      
+      console.log('  - Novos membros sem duplicatas:', novosSemDuplicatas.length)
+      console.log('  - IDs dos novos sem duplicatas:', novosSemDuplicatas.map(m => m.id))
+      
+      return [...listaExistenteUnica, ...novosSemDuplicatas]
+    })
+    setUltimoTamanho(membrosConvertidos.length)
+    
+    console.log('  - Total final de membros:', membrosEmbaralhados.length + novosEmbaralhados.length)
+  }, [membrosConvertidos, ultimoTamanho])
 
   // Carregar membros iniciais e aplicar filtros
   useEffect(() => {
-    // Debug removido para limpar console
+    console.log('🔄 useEffect - Carregando membros iniciais...')
+    console.log('  - dbLoading:', dbLoading)
+    console.log('  - dbError:', dbError)
+    console.log('  - membrosConvertidos.length:', membrosConvertidos.length)
+    console.log('  - user:', !!user)
     
     if (dbError) {
       console.error('❌ Erro no banco de dados:', dbError)
@@ -202,35 +283,12 @@ const Membros = () => {
     }
     
     if (dbLoading) {
-      // Carregando dados do banco
+      console.log('⏳ Carregando dados do banco...')
     }
-    
-    // Converter usuários do banco para formato de membros
-    const membrosUsuarios = dbUsers.map(user => converterUsuarioParaMembro(user, getCategoryNames))
-    
-    // Adicionar o usuário logado se ele for profissional e não estiver na lista
-    const usuarioLogadoNaLista = dbUsers.find(u => u.id === user?.id)
-    if (user && !usuarioLogadoNaLista && user.user_type === 'profissional') {
-      // Adicionando usuário logado à lista
-      const membroLogado = converterUsuarioParaMembro(user, getCategoryNames)
-      membrosUsuarios.unshift(membroLogado) // Adicionar no início da lista
-    }
-    
-    // Converter salões para formato de membros (apenas quando filtro for profissionais)
-    const membrosSalons = tipoMembro === "profissionais" ? 
-      dbSalons.map(salon => converterSalonParaMembro(salon)) : []
-    
-    // Combinar usuários e salões (removida lógica de proprietários duplicados)
-    const membrosConvertidos = [...membrosUsuarios, ...membrosSalons]
-    
-    // Membros convertidos
-    
-
-    
-
     
     // Fallback temporário para desktop quando não há dados
     if (membrosConvertidos.length === 0 && !dbLoading && !user) {
+      console.log('⚠️ Nenhum dado do banco - usando fallback temporário')
       // Nenhum dado do banco - usando fallback temporário
       
         const fallbackMembros = [
@@ -276,28 +334,33 @@ const Membros = () => {
     if (user) {
       // Usuário logado: carrega todos os membros do banco
       // Usuário logado - carregando todos os membros
-      setMembrosExibidos(membrosConvertidos)
+      setMembrosExibidos(membrosEmbaralhados)
       } else {
       // Usuário não logado: apenas 3 membros do banco
       // Usuário não logado - carregando apenas 3 membros
-        setMembrosExibidos(membrosConvertidos.slice(0, 3))
+        setMembrosExibidos(membrosEmbaralhados.slice(0, 3))
     }
     
     // Resetar estado de fim da lista quando filtros mudam
     setChegouAoFinal(false)
-  }, [user, dbUsers, dbSalons, getCategoryNames, dbLoading, dbError, dbHasMore, tipoMembro])
+  }, [user, membrosConvertidos.length, dbLoading, dbError, dbHasMore, tipoMembro])
 
   // Verificar se chegou ao final quando não há mais dados para carregar
   useEffect(() => {
-    const totalItems = dbUsers.length + (tipoMembro === "profissionais" ? dbSalons.length : 0)
+    const totalItems = membrosConvertidos.length
     if (user && !carregando && !dbLoading && !dbHasMore && totalItems > 0) {
       setChegouAoFinal(true)
     }
-  }, [user, carregando, dbLoading, dbHasMore, dbUsers.length, dbSalons.length, tipoMembro])
+  }, [user, carregando, dbLoading, dbHasMore, membrosConvertidos.length])
 
   // Resetar estado de fim quando há novos dados para carregar
   useEffect(() => {
+    console.log('🔄 useEffect - Resetando estado de fim...')
+    console.log('  - user:', !!user)
+    console.log('  - dbHasMore:', dbHasMore)
+    
     if (user && dbHasMore) {
+      console.log('✅ Resetando chegouAoFinal para false')
       setChegouAoFinal(false)
     }
   }, [user, dbHasMore])
@@ -315,6 +378,11 @@ const Membros = () => {
     
     // Carregar mais quando estiver a 200px do final
     if (scrollTop + windowHeight >= documentHeight - 200) {
+      console.log('📜 Scroll detectado - carregando mais membros...')
+      console.log('  - scrollTop:', scrollTop)
+      console.log('  - windowHeight:', windowHeight)
+      console.log('  - documentHeight:', documentHeight)
+      console.log('  - chegouAoFinal:', chegouAoFinal)
       carregarMaisMembros()
     }
   }, [user, carregando, carregarMaisMembros, chegouAoFinal, dbLoading])
@@ -324,8 +392,12 @@ const Membros = () => {
     // Só adicionar o listener se o usuário estiver logado
     if (!user) return
 
+    console.log('📜 Adicionando listener de scroll...')
     window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => {
+      console.log('📜 Removendo listener de scroll...')
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [user, handleScroll])
 
   // Função para lidar com clique em membro
@@ -352,6 +424,7 @@ const Membros = () => {
 
   // Função para lidar com mudança de tipo de membro
   const handleTipoMembroChange = (value: string) => {
+    console.log('🔄 Mudando tipo de membro para:', value)
     setTipoMembro(value)
   }
 
@@ -391,6 +464,7 @@ const Membros = () => {
 
   // Função para limpar filtros
   const limparFiltros = () => {
+    console.log('🧹 Limpando filtros...')
     // Limpando filtros
     setTipoMembro("profissionais")
     setBusca("")
@@ -404,38 +478,87 @@ const Membros = () => {
     })
   }
 
-  // Verificar estado de follow para cada membro
-  useEffect(() => {
-    const checkFollowStates = async () => {
-      if (!user || !membrosExibidos.length) return
+  // Cache para estados de follow para evitar queries desnecessárias
+  const followCache = useRef<Record<string, boolean>>({})
+  const lastCheckedMembers = useRef<string[]>([])
 
-      const states: Record<string, boolean> = {}
-      const loadingStates: Record<string, boolean> = {}
+  // Verificar estado de follow para cada membro (DESABILITADO TEMPORARIAMENTE)
+  // useEffect(() => {
+  //   const checkFollowStates = async () => {
+  //     if (!user || !membrosExibidos.length) return
 
-      for (const membro of membrosExibidos) {
-        loadingStates[membro.id] = true
-        try {
-          const isFollowing = await checkIfFollowing(membro.id)
-          states[membro.id] = isFollowing
-        } catch (error) {
-          console.error(`Erro ao verificar follow para ${membro.id}:`, error)
-          states[membro.id] = false
-        } finally {
-          loadingStates[membro.id] = false
-        }
-      }
+  //     // Verificar se os membros mudaram significativamente
+  //     const currentMemberIds = membrosExibidos.map(m => m.id).sort()
+  //     const lastMemberIds = lastCheckedMembers.current.sort()
+      
+  //     // Se os membros são os mesmos, não fazer nada
+  //     if (JSON.stringify(currentMemberIds) === JSON.stringify(lastMemberIds)) {
+  //       return
+  //     }
 
-      setFollowingStates(states)
-      setFollowLoading(loadingStates)
-    }
+  //     lastCheckedMembers.current = currentMemberIds
 
-    checkFollowStates()
-  }, [user, membrosExibidos, checkIfFollowing])
+  //     const states: Record<string, boolean> = { ...followCache.current }
+  //     const loadingStates: Record<string, boolean> = {}
+
+  //     // Verificar apenas membros que não estão no cache
+  //     const membersToCheck = membrosExibidos.filter(membro => 
+  //       !(membro.id in followCache.current)
+  //     )
+
+  //     if (membersToCheck.length === 0) {
+  //       // Todos os membros já estão no cache
+  //       setFollowingStates(states)
+  //       return
+  //     }
+
+  //     // Verificar follows em batch (máximo 5 por vez para evitar sobrecarga)
+  //     const batchSize = 5
+  //     for (let i = 0; i < membersToCheck.length; i += batchSize) {
+  //       const batch = membersToCheck.slice(i, i + batchSize)
+        
+  //       // Marcar como carregando
+  //       batch.forEach(membro => {
+  //         loadingStates[membro.id] = true
+  //       })
+
+  //       // Verificar follows em paralelo para este batch
+  //       const batchPromises = batch.map(async (membro) => {
+  //         try {
+  //           const isFollowing = await checkIfFollowing(membro.id)
+  //           followCache.current[membro.id] = isFollowing
+  //           states[membro.id] = isFollowing
+  //           return { id: membro.id, success: true }
+  //         } catch (error) {
+  //           console.error(`Erro ao verificar follow para ${membro.id}:`, error)
+  //           followCache.current[membro.id] = false
+  //           states[membro.id] = false
+  //           return { id: membro.id, success: false }
+  //         } finally {
+  //           loadingStates[membro.id] = false
+  //         }
+  //       })
+
+  //       await Promise.all(batchPromises)
+        
+  //       // Pequena pausa entre batches para evitar sobrecarga
+  //       if (i + batchSize < membersToCheck.length) {
+  //         await new Promise(resolve => setTimeout(resolve, 100))
+  //       }
+  //     }
+
+  //     setFollowingStates(states)
+  //     setFollowLoading(loadingStates)
+  //   }
+
+  //   checkFollowStates()
+  // }, [user, membrosExibidos, checkIfFollowing])
 
   // Função para lidar com follow/unfollow
   const handleFollowToggle = async (membroId: string, membroNome: string) => {
     if (!user) return
 
+    console.log('👥 Toggle follow para:', membroId, membroNome)
     setFollowLoading(prev => ({ ...prev, [membroId]: true }))
 
     try {
@@ -443,9 +566,11 @@ const Membros = () => {
       
       if (isCurrentlyFollowing) {
         // Deixar de seguir
+        console.log('👥 Deixando de seguir:', membroId)
         const result = await unfollowUser(membroId)
         if (result.success) {
           setFollowingStates(prev => ({ ...prev, [membroId]: false }))
+          followCache.current[membroId] = false // Atualizar cache
           toast({
             title: "Deixou de seguir",
             description: `Você não está mais seguindo ${membroNome}`,
@@ -459,9 +584,11 @@ const Membros = () => {
         }
       } else {
         // Seguir
+        console.log('👥 Seguindo:', membroId)
         const result = await followUser(membroId)
         if (result.success) {
           setFollowingStates(prev => ({ ...prev, [membroId]: true }))
+          followCache.current[membroId] = true // Atualizar cache
           toast({
             title: "Seguindo!",
             description: `Agora você está seguindo ${membroNome}`,

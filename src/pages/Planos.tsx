@@ -6,17 +6,44 @@ import { Check, Star, Calendar, Bell, Users, BarChart3, Smartphone, Loader2 } fr
 import { Header } from "@/components/Header"
 import { useStripe } from "@/hooks/useStripe"
 import { PLAN_CONFIGS, PlanType } from "@/lib/stripe"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { useAuthContext } from "@/contexts/AuthContext"
 import plansImage from "@/assets/plans-beauty.jpg"
 
 const Planos = () => {
   const { createCheckoutSession, loading, error } = useStripe();
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
+  const { toast } = useToast();
+  const { user } = useAuthContext();
 
   const handleSelectPlan = async (planType: PlanType) => {
+    // Verificar se o usuário está logado antes de tentar comprar
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Você precisa estar logado em uma conta para adquirir um plano. Faça login ou crie uma conta para continuar.",
+        variant: "destructive",
+        duration: 5000
+      });
+      return;
+    }
+
     setSelectedPlan(planType);
     await createCheckoutSession(planType);
   };
+
+  // Exibir erros do Stripe via toast
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Erro ao processar pagamento",
+        description: error,
+        variant: "destructive",
+        duration: 5000
+      });
+    }
+  }, [error, toast]);
 
   const planos = [
     {
@@ -94,15 +121,6 @@ const Planos = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Transforme sua agenda em uma ferramenta profissional
           </p>
-          
-          {/* Exibir erro do Stripe se houver */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-              <p className="text-red-800 text-sm">
-                <strong>Erro:</strong> {error}
-              </p>
-            </div>
-          )}
           <div className="relative rounded-2xl overflow-hidden max-w-4xl mx-auto mb-8">
             <img 
               src={plansImage} 
