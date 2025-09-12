@@ -42,9 +42,9 @@ const AgendaPessoal = () => {
     window.scrollTo(0, 0)
   }, [])
 
-  // Carregar agendamentos do usuário
+  // Carregar agendamentos do usuário (apenas como cliente)
   useEffect(() => {
-    fetchAppointments()
+    fetchAppointments(undefined, true) // asClientOnly = true
   }, [fetchAppointments])
 
   const handleAppointmentClick = (appointment: Appointment) => {
@@ -78,7 +78,7 @@ const AgendaPessoal = () => {
       }
       
       // Recarregar agendamentos para atualizar a lista
-      await fetchAppointments()
+      await fetchAppointments(undefined, true) // asClientOnly = true
       
       toast({
         title: "Agendamento cancelado",

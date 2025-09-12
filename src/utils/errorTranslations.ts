@@ -31,7 +31,6 @@ export const translateError = (error: string | Error): string => {
     // Recursos
     'Not found': 'Recurso não encontrado',
     'Resource not found': 'Recurso não encontrado',
-    'User not found': 'Usuário não encontrado',
     'Service not found': 'Serviço não encontrado',
     'Appointment not found': 'Agendamento não encontrado',
     
@@ -88,7 +87,6 @@ export const translateError = (error: string | Error): string => {
     // Timeout
     'Timeout': 'Timeout. Tente novamente.',
     'Operation timeout': 'Timeout na operação. Tente novamente.',
-    'Request timeout': 'Timeout na solicitação. Tente novamente.',
     
     // Fetch e conexão
     'fetch': 'Erro de conexão. Verifique sua internet.',
@@ -98,7 +96,6 @@ export const translateError = (error: string | Error): string => {
     // Supabase específico
     'PGRST301': 'Limite de uso excedido. Tente novamente em alguns minutos.',
     'PGRST116': 'Recurso não encontrado',
-    'PGRST301': 'Limite de uso excedido. Tente novamente em alguns minutos.',
   }
   
   // Buscar tradução exata
@@ -137,6 +134,11 @@ export const translateError = (error: string | Error): string => {
   
   if (lowerError.includes('invalid')) {
     return 'Dados inválidos. Verifique as informações fornecidas.'
+  }
+  
+  // Verificar se é erro de logout (ignorar erros de "required" durante logout)
+  if (lowerError.includes('signout') || lowerError.includes('logout')) {
+    return 'Logout realizado com sucesso.'
   }
   
   if (lowerError.includes('required') || lowerError.includes('missing')) {

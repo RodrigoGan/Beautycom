@@ -16,6 +16,7 @@ import { useSalons } from "@/hooks/useSalons"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
+import { useProfessionalSalon } from "@/hooks/useProfessionalSalon"
 import { TimeSlotSelector } from "@/components/TimeSlotSelector"
 import { translateError } from "@/utils/errorTranslations"
 import {
@@ -48,6 +49,7 @@ const NovoAgendamento = () => {
   // Removido userSalon - não é mais necessário
   
   const { createAppointment } = useAppointments()
+  const { getProfessionalSalonId } = useProfessionalSalon()
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -459,11 +461,16 @@ const confirmAppointment = async () => {
     const initialStatus = user?.user_type === 'profissional' ? 'confirmed' : 'pending'
     console.log('🔄 NovoAgendamento - Status inicial:', initialStatus, 'Tipo de usuário:', user?.user_type)
 
+    // Determinar salon_id baseado no profissional selecionado
+    const professionalId = formData.profissional || user?.id || ''
+    const salonId = await getProfessionalSalonId(professionalId)
+    console.log('🔄 NovoAgendamento - Salon_id determinado:', salonId, 'para profissional:', professionalId)
+
     // Preparar dados do agendamento
     const appointmentData = {
-      salon_id: null, // Profissionais independentes não têm salon_id
+      salon_id: salonId, // Usar salon_id correto do profissional
       client_id: clienteFinal.id,
-      professional_id: formData.profissional || user?.id || '', // Usar profissional selecionado ou usuário atual
+      professional_id: professionalId, // Usar profissional selecionado ou usuário atual
       service_id: servicoSelecionado.id,
       date: dataLocalFormatada, // Usar a data corrigida
       start_time: selectedTimeSlot,

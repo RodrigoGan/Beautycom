@@ -93,7 +93,7 @@ export const useAppointments = () => {
   const [isFetchingSalon, setIsFetchingSalon] = useState(false)
 
   // Buscar agendamentos do usuário
-  const fetchAppointments = useCallback(async (userId?: string) => {
+  const fetchAppointments = useCallback(async (userId?: string, asClientOnly?: boolean) => {
     if (!userId && !user?.id) return
 
     try {
@@ -102,7 +102,7 @@ export const useAppointments = () => {
 
       const targetUserId = userId || user?.id
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select(`
           *,
@@ -111,11 +111,21 @@ export const useAppointments = () => {
           professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
           service:professional_services(id, name, description, duration_minutes, price)
         `)
-        .or(`client_id.eq.${targetUserId},professional_id.eq.${targetUserId}`)
+
+      // Se asClientOnly=true, buscar apenas agendamentos como cliente
+      if (asClientOnly) {
+        query = query.eq('client_id', targetUserId)
+      } else {
+        // Comportamento padrão: buscar agendamentos como cliente E como profissional
+        query = query.or(`client_id.eq.${targetUserId},professional_id.eq.${targetUserId}`)
+      }
+
+      const { data, error } = await query
         .order('date', { ascending: true })
         .order('start_time', { ascending: true })
 
       if (error) throw error
+
 
       // ✅ SIMPLIFICADO: Filtrar apenas agendamentos de profissionais com agenda ativa
       
@@ -136,20 +146,25 @@ export const useAppointments = () => {
             continue
           }
           
-          // Verificar se é dono do salão
-          const { data: salonData } = await supabase
-            .from('salons_studios')
-            .select('owner_id')
-            .eq('id', appointment.salon_id)
-            .single()
+          // Verificar se é dono do salão (apenas se tiver salon_id)
+          let isSalonOwner = false
+          if (appointment.salon_id) {
+            const { data: salonData } = await supabase
+              .from('salons_studios')
+              .select('owner_id')
+              .eq('id', appointment.salon_id)
+              .single()
+            
+            isSalonOwner = salonData?.owner_id === appointment.professional_id
+          }
           
-          const isSalonOwner = salonData?.owner_id === appointment.professional_id
-          
-          // LÓGICA CORRETA: 
-          // - Se é dono do salão E tem agenda habilitada → pode ver seus agendamentos
-          // - Se é dono do salão MAS NÃO tem agenda habilitada → NÃO pode ver seus agendamentos
+          // LÓGICA CORRIGIDA: 
+          // - Se é dono do salão → pode ver seus agendamentos (independente de agenda_enabled)
           // - Se é profissional com agenda habilitada → pode ver seus agendamentos
-          if (userData?.agenda_enabled) {
+          // - Se é profissional independente (sem salon_id) → pode ver seus agendamentos
+          const shouldInclude = isSalonOwner || userData?.agenda_enabled || !appointment.salon_id
+          
+          if (shouldInclude) {
             filteredData.push(appointment)
           }
         } catch (err) {
@@ -210,7 +225,7 @@ export const useAppointments = () => {
           professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
           service:professional_services(id, name, description, duration_minutes, price)
         `)
-        .or(`salon_id.eq.${salonId},salon_id.is.null`) // ✅ Incluir profissionais independentes
+        .or(`salon_id.eq.${salonId},and(salon_id.is.null,professional_id.eq.${user?.id})`) // ✅ Incluir apenas agendamentos como profissional independente do usuário atual
 
       // Se for um profissional vinculado, filtrar apenas seus agendamentos
       if (professionalId) {
@@ -246,20 +261,25 @@ export const useAppointments = () => {
             continue
           }
           
-          // Verificar se é dono do salão
-          const { data: salonData } = await supabase
-            .from('salons_studios')
-            .select('owner_id')
-            .eq('id', appointment.salon_id)
-            .single()
+          // Verificar se é dono do salão (apenas se tiver salon_id)
+          let isSalonOwner = false
+          if (appointment.salon_id) {
+            const { data: salonData } = await supabase
+              .from('salons_studios')
+              .select('owner_id')
+              .eq('id', appointment.salon_id)
+              .single()
+            
+            isSalonOwner = salonData?.owner_id === appointment.professional_id
+          }
           
-          const isSalonOwner = salonData?.owner_id === appointment.professional_id
-          
-          // LÓGICA CORRETA: 
-          // - Se é dono do salão E tem agenda habilitada → pode ver seus agendamentos
-          // - Se é dono do salão MAS NÃO tem agenda habilitada → NÃO pode ver seus agendamentos
+          // LÓGICA CORRIGIDA: 
+          // - Se é dono do salão → pode ver seus agendamentos (independente de agenda_enabled)
           // - Se é profissional com agenda habilitada → pode ver seus agendamentos
-          if (userData?.agenda_enabled) {
+          // - Se é profissional independente (sem salon_id) → pode ver seus agendamentos
+          const shouldInclude = isSalonOwner || userData?.agenda_enabled || !appointment.salon_id
+          
+          if (shouldInclude) {
             filteredData.push(appointment)
           }
         } catch (err) {
@@ -693,8 +713,12 @@ export const useAppointments = () => {
     }
   }, [])
 
-  // Carregar agendamentos do usuário atual (APENAS quando explicitamente chamado)
-  // useEffect removido para evitar carregamento automático que causa erros
+  // Carregar agendamentos do usuário atual automaticamente
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments(user.id, false)
+    }
+  }, [user?.id, fetchAppointments])
 
   return {
     // Estado

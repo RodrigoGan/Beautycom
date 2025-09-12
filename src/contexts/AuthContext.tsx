@@ -50,9 +50,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     
     try {
       
-      // Adicionar timeout para evitar travamento
+      // Adicionar timeout reduzido para melhor UX
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout ao buscar usuário')), 3000) // 3 segundos
+        setTimeout(() => reject(new Error('Timeout ao buscar usuário')), 1000) // 1 segundo
       })
       
       const fetchPromise = supabase
@@ -82,10 +82,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        // Verificando sessão
+        // Verificando sessão com timeout otimizado
         
-        // Buscar sessão sem timeout para evitar problemas
-        const { data: { session } } = await supabase.auth.getSession()
+        // Buscar sessão com timeout reduzido para melhor UX
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout na verificação de sessão')), 1000) // 1 segundo
+        })
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any
         
         if (session?.user) {
           // Definir usuário básico imediatamente para melhor UX
@@ -100,22 +105,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           } as any
           
           setUser(basicUser)
+          setLoading(false) // Parar loading imediatamente após definir usuário básico
           
-          // Buscar dados completos em background
-          try {
-            const userData = await fetchUserWithCache(session.user.id)
-            setUser(userData)
-          } catch (error) {
-            // Manter dados básicos se falhar
-            console.error('Erro ao buscar dados completos do usuário:', error)
-          }
+          // Buscar dados completos em background (sem bloquear a UI)
+          setTimeout(async () => {
+            try {
+              const userData = await fetchUserWithCache(session.user.id)
+              setUser(userData)
+            } catch (error) {
+              // Manter dados básicos se falhar - não mostrar erro para o usuário
+              console.error('Erro ao buscar dados completos do usuário:', error)
+            }
+          }, 100) // Pequeno delay para não bloquear a UI
         } else {
           setUser(null)
+          setLoading(false)
         }
       } catch (error) {
         console.error('❌ Erro ao verificar sessão:', error)
         setUser(null)
-      } finally {
         setLoading(false)
       }
     }
@@ -141,18 +149,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           } as any
           
           setUser(basicUser)
+          setLoading(false) // Parar loading imediatamente
           
-          // Buscar dados completos em background
-          try {
-            const userData = await fetchUserWithCache(session.user.id)
-            setUser(userData)
-          } catch (error) {
-            console.error('Erro ao buscar dados completos do usuário:', error)
-          }
+          // Buscar dados completos em background (sem bloquear a UI)
+          setTimeout(async () => {
+            try {
+              const userData = await fetchUserWithCache(session.user.id)
+              setUser(userData)
+            } catch (error) {
+              // Manter dados básicos se falhar
+              console.error('Erro ao buscar dados completos do usuário:', error)
+            }
+          }, 100) // Pequeno delay para não bloquear a UI
         } else {
           setUser(null)
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 
@@ -205,10 +217,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       }
 
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Bem-vindo de volta!",
-      })
 
       return { data, error: null }
         
@@ -266,23 +274,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      // Limpar o estado do usuário imediatamente
+      
+      // Limpar o estado do usuário imediatamente (mesmo se houver erro)
       setUser(null)
-
-      // Limpar o cache de usuários
       userCache.clear()
+      
+      // Se houver erro, mas o usuário foi limpo, não mostrar toast
+      if (error) {
+        console.warn('Aviso no logout (ignorado):', error)
+        // Não mostrar toast de erro para logout
+        return
+      }
 
-      toast({
-        title: "Logout realizado",
-        description: "Você foi desconectado com sucesso.",
-      })
     } catch (error) {
-      console.error('Erro no logout:', error)
+      console.error('Erro crítico no logout:', error)
+      // Limpar estado mesmo em caso de erro crítico
+      setUser(null)
+      userCache.clear()
+      
+      // Só mostrar toast para erros críticos
       toast({
         title: "Erro no logout",
-        description: error instanceof Error ? translateError(error.message) : "Erro desconhecido",
+        description: "Ocorreu um erro inesperado durante o logout.",
         variant: "destructive"
       })
     }

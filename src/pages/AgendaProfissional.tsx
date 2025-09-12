@@ -19,7 +19,7 @@ const AgendaProfissional = () => {
   const { user } = useAuthContext()
   const { userSalon } = useSalons(user?.id)
   const { hasPermission, isOwner, isEmployee, loading: permissionsLoading } = useSalonPermissions(userSalon?.id || null)
-  const { appointments, loading: appointmentsLoading, fetchSalonAppointments, todayAppointments, upcomingAppointments } = useAppointments()
+  const { appointments, loading: appointmentsLoading, fetchAppointments, todayAppointments, upcomingAppointments } = useAppointments()
   const { professionals, loading: professionalsLoading, fetchProfessionals, enableAgenda, disableAgenda } = useSalonProfessionals(userSalon?.id || null)
   const { employees, loading: employeesLoading, fetchEmployees, updateEmployee } = useSalonEmployees(userSalon?.id || null)
   
@@ -57,6 +57,12 @@ const AgendaProfissional = () => {
   const [lastLoadedSalonId, setLastLoadedSalonId] = useState<string | null>(null)
   const [loadAttempts, setLoadAttempts] = useState(0)
   const [hasInitialLoad, setHasInitialLoad] = useState(false)
+  
+  // Estado local para agendamentos filtrados (apenas como profissional)
+  const [professionalAppointments, setProfessionalAppointments] = useState<Appointment[]>([])
+  const [professionalTodayAppointments, setProfessionalTodayAppointments] = useState<Appointment[]>([])
+  const [professionalUpcomingAppointments, setProfessionalUpcomingAppointments] = useState<Appointment[]>([])
+  const [upcomingTodayAppointments, setUpcomingTodayAppointments] = useState<Appointment[]>([])
   const [permissions, setPermissions] = useState<Partial<EmployeePermissions>>({
     appointments: {
       view: false,
@@ -96,26 +102,65 @@ const AgendaProfissional = () => {
 
   // Função para recarregar agendamentos considerando o tipo de usuário
   const reloadAppointments = useCallback(async () => {
-    if (!userSalon?.id) return
+    if (!user?.id) return
     
-    // Se for proprietário, carrega todos os agendamentos do salão
-    // Se for profissional vinculado, carrega apenas seus agendamentos
-    const isOwner = userSalon.owner_id === user?.id
-    const professionalId = isOwner ? undefined : user?.id
-    
-    await fetchSalonAppointments(userSalon.id, undefined, professionalId)
-  }, [userSalon?.id, user?.id, fetchSalonAppointments])
+    // Agenda Profissional deve mostrar apenas agendamentos como profissional
+    // fetchAppointments(user.id, false) = buscar como cliente E como profissional
+    // Mas vamos filtrar apenas os como profissional depois
+    await fetchAppointments(user.id, false) // false = não apenas como cliente
+  }, [user?.id, fetchAppointments])
+
+  // Filtrar agendamentos para mostrar apenas os como profissional
+  useEffect(() => {
+    if (appointments && user?.id) {
+      
+      const filteredAppointments = appointments.filter(apt => apt.professional_id === user.id)
+      
+      setProfessionalAppointments(filteredAppointments)
+      
+      // Filtrar agendamentos de hoje
+      const today = new Date().toISOString().split('T')[0]
+      // console.log('🔍 Debug AgendaProfissional - Data de hoje:', today)
+      
+      const todayFiltered = filteredAppointments.filter(apt => apt.date === today)
+      
+      setProfessionalTodayAppointments(todayFiltered)
+      
+      // Filtrar próximos agendamentos (hoje e futuros)
+      const upcomingFiltered = filteredAppointments.filter(apt => apt.date >= today)
+      setProfessionalUpcomingAppointments(upcomingFiltered)
+      
+      // Filtrar agendamentos futuros de hoje
+      const now = new Date()
+      const currentTime = now.getHours() * 60 + now.getMinutes()
+      
+      const upcomingTodayFiltered = todayFiltered.filter(appointment => {
+        if (!appointment.start_time) return false
+        
+        const [hours, minutes] = appointment.start_time.split(':').map(Number)
+        const appointmentTime = hours * 60 + minutes
+        
+        return appointmentTime > currentTime
+      }).sort((a, b) => {
+        if (!a.start_time || !b.start_time) return 0
+        const [aHours, aMinutes] = a.start_time.split(':').map(Number)
+        const [bHours, bMinutes] = b.start_time.split(':').map(Number)
+        return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes)
+      })
+      
+      setUpcomingTodayAppointments(upcomingTodayFiltered)
+      
+    }
+  }, [appointments, user?.id])
 
   // Carregar agendamentos, profissionais e funcionários do salão
   useEffect(() => {
-
-    
     // Sistema de segurança ULTRA RÍGIDO contra loops
     if (!userSalon?.id || userSalon.id.trim() === '') {
-      console.log('❌ ID do salão inválido')
-      // Se for profissional independente, não precisa de salão
+      // Se for profissional independente, não precisa de salão mas precisa carregar agendamentos
       if (user?.user_type === 'profissional' && !userSalon?.id) {
-        console.log('✅ Profissional independente, não precisa de salão')
+        // Carregar apenas agendamentos para profissionais independentes
+        reloadAppointments()
         return
       }
       return
@@ -136,7 +181,6 @@ const AgendaProfissional = () => {
       return
     }
     
-    console.log('✅ Iniciando carregamento único')
     setIsLoadingData(true)
     setLastLoadedSalonId(userSalon.id)
     setLoadAttempts(prev => prev + 1)
@@ -147,7 +191,6 @@ const AgendaProfissional = () => {
       fetchProfessionals(),
       fetchEmployees()
     ]).finally(() => {
-      console.log('✅ Carregamento finalizado')
       setIsLoadingData(false)
       setHasInitialLoad(true)
     })
@@ -202,33 +245,24 @@ const AgendaProfissional = () => {
 
   // Verificar se pode controlar a agenda do profissional
   const canControlAgenda = (professionalId: string, professional: any) => {
-    console.log('🔍 canControlAgenda - Debug:', {
-      professionalId,
-      professionalName: professional?.name,
-      isProfessionalOwner: isProfessionalOwner(professionalId),
-      isOwner: isOwner(),
-      hasPermission: hasPermission('employees.edit'),
-      userSalonOwnerId: userSalon?.owner_id,
-      currentUserId: user?.id
-    })
     
     // Se for o próprio dono do salão, ele pode controlar sua própria agenda
     if (isProfessionalOwner(professionalId)) {
       // Só o próprio dono pode controlar sua agenda
       const canControl = user?.id === professionalId
-      console.log('🔍 É dono do salão, pode controlar:', canControl)
+      // console.log('🔍 É dono do salão, pode controlar:', canControl)
       return canControl
     }
     
     // Para outros profissionais sem agenda própria, o dono do salão pode controlar
     if (isOwner()) {
-      console.log('🔍 É dono do salão, pode controlar outros profissionais')
+      // console.log('🔍 É dono do salão, pode controlar outros profissionais')
       return true
     }
     
     // Para funcionários, precisa ter permissão de edição de funcionários
     const hasEmpPermission = hasPermission('employees.edit')
-    console.log('🔍 Tem permissão de funcionários:', hasEmpPermission)
+    // console.log('🔍 Tem permissão de funcionários:', hasEmpPermission)
     return hasEmpPermission
   }
 
@@ -768,7 +802,7 @@ const AgendaProfissional = () => {
               <Badge variant="secondary">Ativo</Badge>
             </CardTitle>
             <CardDescription>
-              {appointmentsLoading ? 'Carregando...' : `${appointments.length} agendamentos no total`}
+              {appointmentsLoading ? 'Carregando...' : `${professionalAppointments.length} agendamentos no total`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -776,7 +810,7 @@ const AgendaProfissional = () => {
             <div className="grid grid-cols-2 gap-4 sm:hidden">
               <div className="text-center">
                 <div className="text-lg font-bold text-secondary">
-                  {appointmentsLoading ? '...' : todayAppointments.length}
+                  {appointmentsLoading ? '...' : professionalTodayAppointments.length}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <Calendar className="h-3 w-3" />
@@ -785,7 +819,7 @@ const AgendaProfissional = () => {
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold text-primary">
-                  {appointmentsLoading ? '...' : appointments.filter(apt => apt.status === 'confirmed').length}
+                  {appointmentsLoading ? '...' : professionalAppointments.filter(apt => apt.status === 'confirmed').length}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <Clock className="h-3 w-3" />
@@ -798,7 +832,7 @@ const AgendaProfissional = () => {
             <div className="hidden sm:grid sm:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">
-                  {appointmentsLoading ? '...' : appointments.filter(apt => apt.status === 'confirmed').length}
+                  {appointmentsLoading ? '...' : professionalAppointments.filter(apt => apt.status === 'confirmed').length}
                 </div>
                 <div className="text-sm text-muted-foreground">Confirmados</div>
               </div>
@@ -812,13 +846,13 @@ const AgendaProfissional = () => {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-secondary">
-                  {appointmentsLoading ? '...' : todayAppointments.length}
+                  {appointmentsLoading ? '...' : professionalTodayAppointments.length}
                 </div>
                 <div className="text-sm text-muted-foreground">Agendamentos Hoje</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-accent">
-                  {appointmentsLoading ? '...' : upcomingAppointments.length}
+                  {appointmentsLoading ? '...' : professionalUpcomingAppointments.length}
                 </div>
                 <div className="text-sm text-muted-foreground">Próximos</div>
               </div>
@@ -895,7 +929,7 @@ const AgendaProfissional = () => {
                 ) : (
               <div className="space-y-4">
                 {professionals.map((salonProfessional) => {
-                  const todayAppointments = appointments.filter(
+                  const todayAppointments = professionalAppointments.filter(
                     apt => apt.professional?.id === salonProfessional.professional_id && 
                            apt.date === new Date().toISOString().split('T')[0]
                   )
@@ -1026,62 +1060,15 @@ const AgendaProfissional = () => {
               <div className="flex items-center justify-center py-8">
                 <div className="text-primary/60 font-medium">Carregando agendamentos...</div>
                   </div>
-            ) : (() => {
-              // Filtrar apenas agendamentos futuros de hoje
-              const now = new Date()
-              const currentTime = now.getHours() * 60 + now.getMinutes() // Hora atual em minutos
-              
-              console.log('🔍 Debug Próximos Agendamentos:', {
-                totalTodayAppointments: todayAppointments.length,
-                currentTime: currentTime,
-                currentTimeFormatted: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
-                todayAppointments: todayAppointments.map(apt => ({
-                  id: apt.id,
-                  start_time: apt.start_time,
-                  client_name: apt.client?.name,
-                  professional_name: apt.professional?.name
-                }))
-              })
-              
-              const upcomingTodayAppointments = todayAppointments.filter(appointment => {
-                if (!appointment.start_time) return false
-                
-                const [hours, minutes] = appointment.start_time.split(':').map(Number)
-                const appointmentTime = hours * 60 + minutes // Horário do agendamento em minutos
-                
-                const isFuture = appointmentTime > currentTime
-                console.log('🔍 Agendamento:', {
-                  id: appointment.id,
-                  start_time: appointment.start_time,
-                  appointmentTime,
-                  currentTime,
-                  isFuture
-                })
-                
-                return isFuture // Só retorna se for futuro
-              }).sort((a, b) => {
-                // Ordenar por horário (mais cedo primeiro)
-                if (!a.start_time || !b.start_time) return 0
-                const [aHours, aMinutes] = a.start_time.split(':').map(Number)
-                const [bHours, bMinutes] = b.start_time.split(':').map(Number)
-                return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes)
-              })
-              
-              console.log('✅ Agendamentos futuros de hoje:', upcomingTodayAppointments.length)
-              
-              if (upcomingTodayAppointments.length === 0) {
-                return (
-                  <div className="text-center py-8">
-                    <Calendar className="h-12 w-12 mx-auto text-primary/60 mb-4" />
-                    <p className="text-muted-foreground font-medium">Nenhum agendamento futuro para hoje</p>
-                    <p className="text-sm text-muted-foreground">Todos os horários já passaram</p>
-                </div>
-                )
-              }
-              
-              return (
-                <div className="space-y-3">
-                  {upcomingTodayAppointments.map((appointment) => (
+            ) : upcomingTodayAppointments.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 mx-auto text-primary/60 mb-4" />
+                <p className="text-muted-foreground font-medium">Nenhum agendamento futuro para hoje</p>
+                <p className="text-sm text-muted-foreground">Todos os horários já passaram</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingTodayAppointments.map((appointment) => (
                     <div key={appointment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-gradient-card hover:bg-gradient-card/80 transition-all duration-200 gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="text-center flex-shrink-0">
@@ -1105,8 +1092,7 @@ const AgendaProfissional = () => {
                           </div>
                         ))}
                       </div>
-              )
-            })()}
+            )}
             <Button variant="outline" className="w-full mt-4 border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/30 transition-colors" asChild>
               <Link to="/agenda-completa">Ver todos os agendamentos</Link>
                       </Button>

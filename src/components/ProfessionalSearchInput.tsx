@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { User, Search, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+import { useProfessionalSalon } from '@/hooks/useProfessionalSalon'
 
 interface Professional {
   id: string
@@ -26,6 +27,7 @@ export const ProfessionalSearchInput: React.FC<ProfessionalSearchInputProps> = (
   disabled = false
 }) => {
   const { toast } = useToast()
+  const { getMultipleProfessionalSalonIds } = useProfessionalSalon()
   const [searchTerm, setSearchTerm] = useState('')
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [loading, setLoading] = useState(false)
@@ -84,11 +86,15 @@ export const ProfessionalSearchInput: React.FC<ProfessionalSearchInputProps> = (
           throw directError
         }
 
+        // Buscar salon_ids para os profissionais encontrados
+        const professionalIds = directResults?.map(prof => prof.id) || []
+        const salonIdMap = await getMultipleProfessionalSalonIds(professionalIds)
+
         searchResults = directResults?.map(prof => ({
           id: prof.id,
           name: prof.name,
           profile_photo: prof.profile_photo,
-          salon_id: null // Profissionais independentes
+          salon_id: salonIdMap[prof.id] || null // Usar salon_id correto ou null se independente
         })) || []
       }
 
