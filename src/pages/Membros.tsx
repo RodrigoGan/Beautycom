@@ -101,7 +101,7 @@ const Membros = () => {
   // Estados para controle de follow
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({})
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({})
-
+  
   // Hook para buscar categorias
   const { categories, getCategoryNames } = useCategories()
   
@@ -280,9 +280,6 @@ const Membros = () => {
     return [...membrosUsuarios, ...membrosSalons]
   }, [membrosUsuarios, membrosSalons])
   
-  // Sistema de embaralhamento removido - agora é feito no banco de dados
-  
-
   // Carregar membros iniciais e aplicar filtros
   useEffect(() => {
     console.log('🔄 useEffect - Carregando membros iniciais...')
