@@ -44,9 +44,9 @@ const NovoAgendamento = () => {
 
   // Hooks
   const { user } = useAuthContext()
+  const { userSalon } = useSalons(user?.id)
   console.log('NovoAgendamento - User:', user?.id)
-  
-  // Removido userSalon - não é mais necessário
+  console.log('NovoAgendamento - UserSalon:', userSalon?.id)
   
   const { createAppointment } = useAppointments()
   const { getProfessionalSalonId } = useProfessionalSalon()
@@ -69,23 +69,29 @@ const NovoAgendamento = () => {
   // Refs
   const clientesDropdownRef = useRef<HTMLDivElement>(null)
 
-  // Inicializar profissional com o usuário atual se ele for profissional
+  // Inicializar profissional com o usuário atual se ele for profissional independente
   useEffect(() => {
-    if (user?.user_type === 'profissional') {
+    const isSalonOwner = userSalon?.owner_id === user?.id
+    
+    // Só auto-selecionar se for profissional independente (sem salão)
+    if (user?.user_type === 'profissional' && !isSalonOwner) {
       setFormData(prev => ({ ...prev, profissional: user.id }))
     }
-  }, [user?.id, user?.user_type])
+  }, [user?.id, user?.user_type, userSalon?.owner_id])
 
   // Auto-selecionar profissional quando há apenas um disponível
   useEffect(() => {
-    if (profissionais.length === 1 && user?.user_type === 'profissional' && !formData.profissional) {
+    const isSalonOwner = userSalon?.owner_id === user?.id
+    
+    // Só auto-selecionar se for profissional independente (sem salão) e houver apenas um profissional
+    if (profissionais.length === 1 && user?.user_type === 'profissional' && !isSalonOwner && !formData.profissional) {
       const unicoProfissional = profissionais[0]
       if (unicoProfissional.id === user.id) {
         setFormData(prev => ({ ...prev, profissional: user.id }))
         console.log('✅ Auto-selecionando profissional único:', user.name)
       }
     }
-  }, [profissionais, user?.id, user?.user_type, formData.profissional])
+  }, [profissionais, user?.id, user?.user_type, userSalon?.owner_id, formData.profissional])
 
   // Estado para horário selecionado
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('')
@@ -186,8 +192,11 @@ const NovoAgendamento = () => {
         setLoadingProfissionais(true)
         console.log('NovoAgendamento - Carregando profissionais com agenda ativa')
         
-        // Se o usuário é profissional, mostrar apenas ele mesmo
-        if (user?.user_type === 'profissional') {
+        // Verificar se é proprietário de salão
+        const isSalonOwner = userSalon?.owner_id === user?.id
+        
+        // Se o usuário é profissional independente (sem salão), mostrar apenas ele mesmo
+        if (user?.user_type === 'profissional' && !isSalonOwner) {
           const profissionalData = [{
             id: user.id,
             name: user.name,
@@ -198,8 +207,52 @@ const NovoAgendamento = () => {
           }]
           setProfissionais(profissionalData)
           console.log('NovoAgendamento - Profissional independente carregado:', user.name)
+        } else if (isSalonOwner) {
+          // Se é proprietário de salão, buscar profissionais do salão
+          console.log('NovoAgendamento - Carregando profissionais do salão:', userSalon?.id)
+          
+          const { data: salonProfessionals, error } = await supabase
+            .from('salon_professionals')
+            .select(`
+              professional_id,
+              status,
+              professional:users!salon_professionals_professional_id_fkey(
+                id, name, email, profile_photo, user_type, agenda_enabled
+              )
+            `)
+            .eq('salon_id', userSalon?.id)
+            .eq('status', 'accepted')
+          
+          if (error) {
+            console.error('Erro ao carregar profissionais do salão:', error)
+            return
+          }
+          
+          // Mapear profissionais do salão
+          const salonProfessionalsList = salonProfessionals?.map(sp => sp.professional).filter(Boolean) || []
+          
+          // Verificar se o proprietário já está na lista de profissionais vinculados
+          const isOwnerInList = salonProfessionalsList.some(prof => prof.id === user.id)
+          
+          // Incluir o proprietário apenas se não estiver na lista
+          const profissionaisData = isOwnerInList 
+            ? salonProfessionalsList
+            : [
+                {
+                  id: user.id,
+                  name: user.name,
+                  email: user.email,
+                  profile_photo: user.profile_photo,
+                  user_type: user.user_type,
+                  agenda_enabled: user.agenda_enabled
+                },
+                ...salonProfessionalsList
+              ]
+          
+          setProfissionais(profissionaisData)
+          console.log('NovoAgendamento - Profissionais do salão carregados:', profissionaisData.length)
         } else {
-          // Buscar todos os profissionais com agenda ativa (para administradores)
+          // Buscar todos os profissionais com agenda ativa (para outros casos)
           const { data: profissionaisData, error } = await supabase
             .from('users')
             .select('id, name, email, profile_photo, user_type, agenda_enabled')
@@ -224,7 +277,7 @@ const NovoAgendamento = () => {
     }
     
     fetchProfissionais()
-  }, [user?.id])
+  }, [user?.id, userSalon?.id])
 
   // Fechar dropdown quando clicar fora
   useEffect(() => {
@@ -581,6 +634,11 @@ const confirmAppointment = async () => {
   
   // Verificar se o usuário pode criar agendamentos
   const canCreateAppointments = () => {
+    // Se é proprietário de salão, pode criar agendamentos
+    if (userSalon?.owner_id === user?.id) {
+      return true
+    }
+    
     // Se é profissional com agenda ativa, pode criar agendamentos
     if (user?.user_type === 'profissional' && user?.agenda_enabled) {
       return true
@@ -611,14 +669,22 @@ const confirmAppointment = async () => {
                 <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                 <h2 className="text-xl font-semibold mb-2">Agenda não disponível</h2>
                 <p className="text-muted-foreground mb-6">
-                  {user?.user_type === 'profissional' 
+                  {userSalon?.owner_id === user?.id
+                    ? "Você tem permissão para criar agendamentos, mas há um problema com o carregamento dos dados."
+                    : user?.user_type === 'profissional' 
                     ? "Sua agenda trial expirou ou não está ativa. Entre em contato com o suporte."
                     : "Você precisa ter um salão cadastrado para criar agendamentos."
                   }
                 </p>
               </div>
               <div className="flex gap-4 justify-center">
-                {user?.user_type === 'profissional' ? (
+                {userSalon?.owner_id === user?.id ? (
+                  <Button variant="outline" asChild>
+                    <Link to={fromAdmin ? "/area-administrativa" : "/agenda-completa"}>
+                      {fromAdmin ? "Voltar para Área Administrativa" : "Voltar para Agenda Completa"}
+                    </Link>
+                  </Button>
+                ) : user?.user_type === 'profissional' ? (
                   <Button variant="outline" asChild>
                     <Link to={fromAdmin ? "/area-administrativa" : "/agenda-profissional"}>
                       {fromAdmin ? "Voltar para Área Administrativa" : "Voltar"}
@@ -746,17 +812,17 @@ const confirmAppointment = async () => {
                   <Input 
                     id="profissional" 
                     value={profissionais.find(p => p.id === formData.profissional)?.name || user?.name || 'Selecione um profissional'}
-                    onClick={() => user?.user_type !== 'profissional' && setShowProfissionaisDropdown(!showProfissionaisDropdown)}
+                    onClick={() => (userSalon?.owner_id === user?.id || user?.user_type !== 'profissional') && setShowProfissionaisDropdown(!showProfissionaisDropdown)}
                     readOnly
-                    className={`bg-background ${user?.user_type === 'profissional' ? 'cursor-default' : 'cursor-pointer'}`}
-                    placeholder={user?.user_type === 'profissional' ? 'Você' : 'Clique para selecionar um profissional'}
+                    className={`bg-background ${(userSalon?.owner_id === user?.id || user?.user_type !== 'profissional') ? 'cursor-pointer' : 'cursor-default'}`}
+                    placeholder={(userSalon?.owner_id === user?.id || user?.user_type !== 'profissional') ? 'Clique para selecionar um profissional' : 'Você'}
                   />
-                  {user?.user_type !== 'profissional' && (
+                  {(userSalon?.owner_id === user?.id || user?.user_type !== 'profissional') && (
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   )}
                   
-                  {/* Dropdown de profissionais - apenas para não profissionais */}
-                  {showProfissionaisDropdown && user?.user_type !== 'profissional' && (
+                  {/* Dropdown de profissionais - para proprietários de salão ou não profissionais */}
+                  {showProfissionaisDropdown && (userSalon?.owner_id === user?.id || user?.user_type !== 'profissional') && (
                     <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto" data-profissional-dropdown>
                       {loadingProfissionais ? (
                         <div className="p-3 text-center text-muted-foreground">
@@ -791,7 +857,9 @@ const confirmAppointment = async () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {user?.user_type === 'profissional'
+                  {userSalon?.owner_id === user?.id
+                    ? 'Selecione o profissional que realizará o serviço'
+                    : user?.user_type === 'profissional'
                     ? 'O agendamento será criado para você como profissional'
                     : formData.profissional === user?.id 
                     ? 'O agendamento será criado para você como profissional'

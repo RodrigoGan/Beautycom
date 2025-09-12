@@ -16,6 +16,7 @@ import { useFollows } from "@/hooks/useFollows"
 import { useMainPosts } from "@/hooks/useMainPosts"
 import { useSalonMainPosts } from "@/hooks/useSalonMainPosts"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 import {
   Dialog,
   DialogContent,
@@ -91,6 +92,12 @@ const Membros = () => {
   const [habilidadeFiltro, setHabilidadeFiltro] = useState("todas")
   const [localizacaoFiltro, setLocalizacaoFiltro] = useState("")
   
+  // Estados para auto preenchimento
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [isExactSearch, setIsExactSearch] = useState(false)
+  
   // Estados para controle de follow
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({})
   const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({})
@@ -101,6 +108,7 @@ const Membros = () => {
   // Memoizar os filtros para evitar recriações desnecessárias
   const userFilters = useMemo(() => ({
     search: buscaDebounced,
+    exactSearch: isExactSearch,
     userType: tipoMembro === "profissionais" ? "profissional" as const : 
               tipoMembro === "usuarios" ? "usuario" as const : 
               tipoMembro === "todos" ? "all" as const : "profissional" as const,
@@ -121,7 +129,7 @@ const Membros = () => {
                 }
                 return c.name === mapping[habilidadeFiltro]
               })?.id : undefined
-  }), [buscaDebounced, tipoMembro, localizacaoFiltro, habilidadeFiltro, categories])
+  }), [buscaDebounced, isExactSearch, tipoMembro, localizacaoFiltro, habilidadeFiltro, categories])
   
   // Hook para buscar usuários e salões do banco de dados
   const { 
@@ -153,11 +161,83 @@ const Membros = () => {
   //   // Esta função foi removida pois agora aplicamos filtros diretamente no banco de dados
   // }, [dbUsers, busca, tipoMembro, habilidadeFiltro, localizacaoFiltro, converterUsuarioParaMembro])
 
-  // Debounce para busca
+  // Função para buscar sugestões no banco de dados
+  const fetchSearchSuggestions = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchSuggestions([])
+      return
+    }
+    
+    setSuggestionsLoading(true)
+    
+    try {
+      // Buscar sugestões de usuários
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('name, nickname')
+        .or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+        .limit(5)
+      
+      // Buscar sugestões de salões
+      const { data: salonsData } = await supabase
+        .from('salons_studios')
+        .select('name')
+        .ilike('name', `%${searchTerm}%`)
+        .limit(5)
+      
+      // Combinar sugestões
+      const suggestions = []
+      
+      // Adicionar nomes de usuários
+      usersData?.forEach(user => {
+        if (user.name) suggestions.push(user.name)
+        if (user.nickname) suggestions.push(`@${user.nickname}`)
+      })
+      
+      // Adicionar nomes de salões
+      salonsData?.forEach(salon => {
+        if (salon.name) suggestions.push(salon.name)
+      })
+      
+      // Remover duplicatas e limitar
+      setSearchSuggestions([...new Set(suggestions)].slice(0, 8))
+      
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error)
+      setSearchSuggestions([])
+    } finally {
+      setSuggestionsLoading(false)
+    }
+  }
+
+  // Função para fazer busca exata quando uma sugestão é selecionada
+  const handleSuggestionClick = (suggestion: string) => {
+    setBusca(suggestion)
+    setShowSuggestions(false)
+    setIsExactSearch(true) // Marcar como busca exata
+  }
+
+  // Função para resetar busca exata quando o usuário digita
+  const handleSearchChange = (value: string) => {
+    setBusca(value)
+    setShowSuggestions(value.length > 0)
+    setIsExactSearch(false) // Resetar busca exata quando usuário digita
+  }
+
+  // Debounce para busca principal
   useEffect(() => {
     const timer = setTimeout(() => {
       setBuscaDebounced(busca)
     }, 500)
+
+    return () => clearTimeout(timer)
+  }, [busca])
+
+  // Debounce para sugestões (mais rápido)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchSearchSuggestions(busca)
+    }, 300)
 
     return () => clearTimeout(timer)
   }, [busca])
@@ -184,16 +264,10 @@ const Membros = () => {
   const membrosUsuarios = useMemo(() => {
     const converted = dbUsers.map(user => converterUsuarioParaMembro(user, getCategoryNames))
     
-    // Adicionar o usuário logado se ele for profissional e não estiver na lista
-    const usuarioLogadoNaLista = dbUsers.find(u => u.id === user?.id)
-    if (user && !usuarioLogadoNaLista && user.user_type === 'profissional') {
-      // Adicionando usuário logado à lista
-      const membroLogado = converterUsuarioParaMembro(user, getCategoryNames)
-      converted.unshift(membroLogado) // Adicionar no início da lista
-    }
+    // Usuário logado será tratado como membro comum - sem tratamento especial
     
     return converted
-  }, [dbUsers, user, getCategoryNames])
+  }, [dbUsers, getCategoryNames])
   
   // Converter salões para formato de membros (otimizado)
   const membrosSalons = useMemo(() => {
@@ -206,64 +280,8 @@ const Membros = () => {
     return [...membrosUsuarios, ...membrosSalons]
   }, [membrosUsuarios, membrosSalons])
   
-  // 🎲 EMBARALHAMENTO INCREMENTAL: Manter ordem dos membros já carregados
-  const [membrosEmbaralhados, setMembrosEmbaralhados] = useState<any[]>([])
-  const [ultimoTamanho, setUltimoTamanho] = useState(0)
+  // Sistema de embaralhamento removido - agora é feito no banco de dados
   
-  useEffect(() => {
-    console.log('🎲 Processando membros...')
-    console.log('  - Total de membros convertidos:', membrosConvertidos.length)
-    console.log('  - Último tamanho:', ultimoTamanho)
-    
-    if (membrosConvertidos.length === 0) {
-      setMembrosEmbaralhados([])
-      setUltimoTamanho(0)
-      return
-    }
-    
-    if (membrosConvertidos.length <= ultimoTamanho) {
-      // Se não há novos membros, manter a ordem atual
-      console.log('  - Nenhum membro novo, mantendo ordem atual')
-      return
-    }
-    
-    // Há novos membros - adicionar ao final e embaralhar apenas os novos
-    const novosMembros = membrosConvertidos.slice(ultimoTamanho)
-    console.log('  - Novos membros:', novosMembros.length)
-    console.log('  - IDs dos novos membros:', novosMembros.map(m => m.id))
-    
-    // Remover duplicatas baseado no ID
-    const membrosUnicos = novosMembros.filter((membro, index, array) => 
-      array.findIndex(m => m.id === membro.id) === index
-    )
-    console.log('  - Membros únicos após remoção de duplicatas:', membrosUnicos.length)
-    console.log('  - IDs dos membros únicos:', membrosUnicos.map(m => m.id))
-    
-    // Embaralhar apenas os novos membros únicos
-    const novosEmbaralhados = [...membrosUnicos].sort(() => Math.random() - 0.5)
-    console.log('  - IDs dos novos após embaralhamento:', novosEmbaralhados.map(m => m.id))
-    
-    // Adicionar os novos membros embaralhados ao final da lista existente
-    setMembrosEmbaralhados(prev => {
-      // Remover duplicatas da lista existente também
-      const listaExistenteUnica = prev.filter((membro, index, array) => 
-        array.findIndex(m => m.id === membro.id) === index
-      )
-      
-      // Verificar se os novos membros já existem na lista existente
-      const novosSemDuplicatas = novosEmbaralhados.filter(novoMembro => 
-        !listaExistenteUnica.some(existente => existente.id === novoMembro.id)
-      )
-      
-      console.log('  - Novos membros sem duplicatas:', novosSemDuplicatas.length)
-      console.log('  - IDs dos novos sem duplicatas:', novosSemDuplicatas.map(m => m.id))
-      
-      return [...listaExistenteUnica, ...novosSemDuplicatas]
-    })
-    setUltimoTamanho(membrosConvertidos.length)
-    
-    console.log('  - Total final de membros:', membrosEmbaralhados.length + novosEmbaralhados.length)
-  }, [membrosConvertidos, ultimoTamanho])
 
   // Carregar membros iniciais e aplicar filtros
   useEffect(() => {
@@ -287,7 +305,7 @@ const Membros = () => {
     }
     
     // Fallback temporário para desktop quando não há dados
-    if (membrosConvertidos.length === 0 && !dbLoading && !user) {
+    if (membrosConvertidos.length === 0 && !dbLoading) {
       console.log('⚠️ Nenhum dado do banco - usando fallback temporário')
       // Nenhum dado do banco - usando fallback temporário
       
@@ -334,16 +352,16 @@ const Membros = () => {
     if (user) {
       // Usuário logado: carrega todos os membros do banco
       // Usuário logado - carregando todos os membros
-      setMembrosExibidos(membrosEmbaralhados)
+      setMembrosExibidos(membrosConvertidos)
       } else {
       // Usuário não logado: apenas 3 membros do banco
       // Usuário não logado - carregando apenas 3 membros
-        setMembrosExibidos(membrosEmbaralhados.slice(0, 3))
+      setMembrosExibidos(membrosConvertidos.slice(0, 3))
     }
     
     // Resetar estado de fim da lista quando filtros mudam
     setChegouAoFinal(false)
-  }, [user, membrosConvertidos.length, dbLoading, dbError, dbHasMore, tipoMembro])
+  }, [user, membrosConvertidos, dbLoading, dbError, dbHasMore, busca, habilidadeFiltro, localizacaoFiltro, tipoMembro])
 
   // Verificar se chegou ao final quando não há mais dados para carregar
   useEffect(() => {
@@ -649,15 +667,47 @@ const Membros = () => {
         <Card className="mb-6 bg-gradient-card border-primary/10 shadow-beauty-card">
           <CardContent className="p-6">
             <div className="space-y-4">
-              {/* Busca */}
+              {/* Busca com Auto Preenchimento */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Buscar por nome, @nickname ou descrição..." 
+                  placeholder="Buscar por nome ou @nickname..." 
                   className="pl-10 border-primary/20 focus:border-primary"
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
+                  value={busca}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onFocus={() => setShowSuggestions(busca.length > 0)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 />
+                
+                {/* Loading indicator */}
+                {suggestionsLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  </div>
+                )}
+                
+                {/* Dropdown de Sugestões */}
+                {showSuggestions && (searchSuggestions.length > 0 || suggestionsLoading) && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-50 mt-1">
+                    {suggestionsLoading ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                        Buscando sugestões...
+                      </div>
+                    ) : (
+                      searchSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm flex items-center gap-2"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                        >
+                          <Search className="h-3 w-3 text-muted-foreground" />
+                          {suggestion}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
               
               {/* Filtros em linha */}

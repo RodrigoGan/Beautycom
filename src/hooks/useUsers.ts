@@ -4,6 +4,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 
 export interface UserFilters {
   search?: string
+  exactSearch?: boolean
   userType?: 'usuario' | 'profissional' | 'all'
   category?: string
   location?: string
@@ -173,7 +174,7 @@ export function useUsers(filters: UserFilters = {}) {
       let usersQuery = supabase
         .from('users')
         .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) // ✅ VOLTANDO PARA ORDEM NORMAL
         .range(startOffset, startOffset + 11)
 
       // Query de usuários base construída
@@ -198,7 +199,21 @@ export function useUsers(filters: UserFilters = {}) {
       // Aplicar filtro de busca para usuários
       if (filters.search && filters.search.trim()) {
         const searchTerm = filters.search.trim()
-        usersQuery = usersQuery.or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+        
+        if (filters.exactSearch) {
+          // Busca exata: nome ou nickname exato
+          if (searchTerm.startsWith('@')) {
+            // Se começa com @, buscar nickname exato
+            const nickname = searchTerm.substring(1)
+            usersQuery = usersQuery.eq('nickname', nickname)
+          } else {
+            // Buscar nome exato
+            usersQuery = usersQuery.eq('name', searchTerm)
+          }
+        } else {
+          // Busca parcial (comportamento original)
+          usersQuery = usersQuery.or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+        }
         // Filtro de busca aplicado
       }
 
@@ -225,13 +240,20 @@ export function useUsers(filters: UserFilters = {}) {
             *,
             owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
           `, { count: 'exact' })
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }) // ✅ VOLTANDO PARA ORDEM NORMAL
           .range(startOffset, startOffset + 11)
 
         // Aplicar filtro de busca para salões
         if (filters.search && filters.search.trim()) {
           const searchTerm = filters.search.trim()
-          salonsQuery = salonsQuery.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          
+          if (filters.exactSearch) {
+            // Busca exata: nome do salão exato
+            salonsQuery = salonsQuery.eq('name', searchTerm)
+          } else {
+            // Busca parcial (comportamento original)
+            salonsQuery = salonsQuery.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          }
           // Filtro de busca aplicado
         }
 
@@ -416,7 +438,7 @@ export function useUsers(filters: UserFilters = {}) {
       let usersQuery = supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) // ✅ VOLTANDO PARA ORDEM NORMAL
         .range(users.length, users.length + 11)
 
       // Aplicar filtros atuais
@@ -432,7 +454,21 @@ export function useUsers(filters: UserFilters = {}) {
 
       if (filters.search && filters.search.trim()) {
         const searchTerm = filters.search.trim()
-        usersQuery = usersQuery.or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+        
+        if (filters.exactSearch) {
+          // Busca exata: nome ou nickname exato
+          if (searchTerm.startsWith('@')) {
+            // Se começa com @, buscar nickname exato
+            const nickname = searchTerm.substring(1)
+            usersQuery = usersQuery.eq('nickname', nickname)
+          } else {
+            // Buscar nome exato
+            usersQuery = usersQuery.eq('name', searchTerm)
+          }
+        } else {
+          // Busca parcial (comportamento original)
+          usersQuery = usersQuery.or(`name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+        }
       }
 
       if (filters.category) {
@@ -471,12 +507,19 @@ export function useUsers(filters: UserFilters = {}) {
             *,
             owner:users!salons_studios_owner_id_fkey(id, name, email, profile_photo, user_type)
           `)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }) // ✅ VOLTANDO PARA ORDEM NORMAL
           .range(salons.length, salons.length + 11)
 
         if (filters.search && filters.search.trim()) {
           const searchTerm = filters.search.trim()
-          salonsQuery = salonsQuery.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          
+          if (filters.exactSearch) {
+            // Busca exata: nome do salão exato
+            salonsQuery = salonsQuery.eq('name', searchTerm)
+          } else {
+            // Busca parcial (comportamento original)
+            salonsQuery = salonsQuery.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          }
         }
 
         if (filters.location && filters.location.trim()) {

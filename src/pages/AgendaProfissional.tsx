@@ -8,7 +8,7 @@ import { Link } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useSalons } from "@/hooks/useSalons"
 import { useSalonPermissions, type EmployeePermissions, type SalonEmployee } from "@/hooks/useSalonPermissions"
-import { useAppointments } from "@/hooks/useAppointments"
+import { useAppointments, type Appointment } from "@/hooks/useAppointments"
 import { useSalonProfessionals } from "@/hooks/useSalonProfessionals"
 import { useSalonEmployees } from "@/hooks/useSalonEmployees"
 import { useEffect, useState, useCallback } from "react"
@@ -916,7 +916,8 @@ const AgendaProfissional = () => {
           </Button>
         </div>
 
-        {/* Profissionais da Equipe */}
+        {/* Profissionais da Equipe - Apenas para usuários com salão */}
+        {userSalon?.id && (
           <Card className="mb-6">
           <CardHeader>
             <CardTitle>Profissionais da Equipe</CardTitle>
@@ -1043,6 +1044,7 @@ const AgendaProfissional = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Próximos Agendamentos de Hoje */}
         <Card className="mb-6">
