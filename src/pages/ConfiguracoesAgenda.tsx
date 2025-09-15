@@ -16,6 +16,7 @@ import { useAgendaConfig } from "@/hooks/useAgendaConfig"
 import { useProfessionalServices } from "@/hooks/useProfessionalServices"
 import { useCategories } from "@/hooks/useCategories"
 import { useAgendaStatus } from "@/hooks/useAgendaStatus"
+import { useSubscriptionInfo } from "@/hooks/useSubscriptionInfo"
 import { useToast } from "@/hooks/use-toast"
 import { useEffect, useState } from "react"
 import { compressImage } from "@/utils/compression"
@@ -29,8 +30,16 @@ const ConfiguracoesAgenda = () => {
   // Hook para verificar status da agenda
   const { hasActiveAgenda, loading: agendaStatusLoading } = useAgendaStatus(user?.id)
   
-  // Lógica de permissões simplificada
+  // Hook para verificar informações de assinatura
+  const { subscriptionSummary } = useSubscriptionInfo(user?.id)
+  
+  // Lógica de permissões melhorada
   const canManageSettings = user?.user_type === 'profissional' && hasActiveAgenda
+  
+  // Verificar tipo de profissional
+  const isIndependentProfessional = user?.user_type === 'profissional' && !userSalon?.id
+  const isSalonEmployee = user?.user_type === 'profissional' && userSalon?.id && userSalon?.owner_id !== user?.id
+  const isSalonOwner = user?.user_type === 'profissional' && userSalon?.id && userSalon?.owner_id === user?.id
   
   const permissionsLoading = agendaStatusLoading
   
@@ -100,7 +109,7 @@ const ConfiguracoesAgenda = () => {
     deleteService,
     toggleServiceStatus,
     validateService
-  } = useProfessionalServices(user?.id, null) // Profissionais independentes não têm salon_id
+  } = useProfessionalServices(user?.id, userSalon?.id) // Usar salon_id correto
   
   // Estados locais para o formulário
   const [intervaloAlmoco, setIntervaloAlmoco] = useState(true)
@@ -502,6 +511,45 @@ const ConfiguracoesAgenda = () => {
 
   // Verificar se pode gerenciar configurações
   if (!permissionsLoading && !canManageSettings) {
+    // Determinar tipo de mensagem baseado no tipo de profissional
+    let title = "Permissão Insuficiente"
+    let description = "Você não tem permissão para gerenciar configurações."
+    let message = ""
+    let buttonText = "Voltar para Agenda"
+    let buttonLink = "/agenda-profissional"
+
+    if (isIndependentProfessional) {
+      // Verificar se tem trial expirado e sem assinatura
+      const hasExpiredTrial = subscriptionSummary?.type === 'trial' && subscriptionSummary?.status === 'expired'
+      const hasNoSubscription = subscriptionSummary?.type === 'none' || !subscriptionSummary?.isActive
+      
+      if (hasExpiredTrial || hasNoSubscription) {
+        title = "Trial Expirado"
+        description = "Seu período de teste expirou e você não possui uma assinatura ativa."
+        message = "Para continuar usando a agenda profissional, você precisa assinar um plano. Escolha o plano que melhor se adequa às suas necessidades."
+        buttonText = "Ver Planos"
+        buttonLink = "/planos" // Assumindo que existe uma página de planos
+      } else {
+        title = "Agenda Não Ativa"
+        description = "Sua agenda profissional não está ativa no momento."
+        message = "Para acessar as configurações da agenda, você precisa ativar sua agenda profissional. Verifique se você tem serviços cadastrados e se sua assinatura está ativa."
+        buttonText = "Ativar Agenda"
+        buttonLink = "/agenda-profissional"
+      }
+    } else if (isSalonEmployee) {
+      title = "Permissão Insuficiente"
+      description = "Você não tem permissão para gerenciar configurações."
+      message = "Entre em contato com o administrador do salão para solicitar esta permissão."
+      buttonText = "Voltar para Agenda"
+      buttonLink = "/agenda-profissional"
+    } else if (isSalonOwner) {
+      title = "Agenda Não Ativa"
+      description = "A agenda do seu salão não está ativa no momento."
+      message = "Para acessar as configurações da agenda, você precisa ativar a agenda do seu salão. Verifique se você tem profissionais cadastrados e se sua assinatura está ativa."
+      buttonText = "Ativar Agenda"
+      buttonLink = "/agenda-profissional"
+    }
+
     return (
       <div className="min-h-screen bg-gradient-subtle">
         <Header />
@@ -510,19 +558,24 @@ const ConfiguracoesAgenda = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="h-5 w-5" />
-                Permissão Insuficiente
+                {title}
               </CardTitle>
               <CardDescription>
-                Você não tem permissão para gerenciar configurações.
+                {description}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Entre em contato com o administrador do salão para solicitar esta permissão.
+                {message}
               </p>
-              <Button asChild className="w-full">
-                <Link to="/agenda-profissional">Voltar para Agenda</Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button asChild className="flex-1">
+                  <Link to={buttonLink}>{buttonText}</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/agenda-profissional">Voltar</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

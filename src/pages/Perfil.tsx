@@ -26,6 +26,8 @@ import { EmployeeInvites } from "@/components/EmployeeInvites"
 import { ProfessionalInvites } from "@/components/ProfessionalInvites"
 import { WorkplaceCard } from "@/components/WorkplaceCard"
 import { ScheduleModal } from "@/components/ScheduleModal"
+import { AgendaUnavailableModal } from "@/components/AgendaUnavailableModal"
+import { useProfessionalAgendaStatus } from "@/hooks/useProfessionalAgendaStatus"
 
 import { MainPostButton } from "@/components/MainPostButton"
 import { useMainPosts } from "@/hooks/useMainPosts"
@@ -55,6 +57,8 @@ const Perfil = () => {
   const [showPostModal, setShowPostModal] = useState(false)
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [showAgendaUnavailableModal, setShowAgendaUnavailableModal] = useState(false)
+  const [isModalTransitioning, setIsModalTransitioning] = useState(false)
   const [followModalType, setFollowModalType] = useState<'following' | 'followers'>('following')
   const [activityModalType, setActivityModalType] = useState<'favorites' | 'likes'>('favorites')
   const [modalTitle, setModalTitle] = useState('')
@@ -427,6 +431,15 @@ const Perfil = () => {
     unmarkAsMain 
   } = useMainPosts(targetUserId || '')
 
+  // Hook para verificar status da agenda do profissional
+  const { 
+    hasServices, 
+    hasActiveAgenda, 
+    agendaType, 
+    isTrialExpired, 
+    checkAgendaStatus 
+  } = useProfessionalAgendaStatus(displayUser?.id)
+
   // Função para abrir modal de follow
   const openFollowModal = (type: 'following' | 'followers') => {
     setFollowModalType(type)
@@ -497,12 +510,52 @@ const Perfil = () => {
   }
 
   // Função para agendar horário com profissional
-  const handleScheduleClick = (professionalUser: any) => {
-    if (user) {
-      setShowScheduleModal(true)
-    } else {
+  const handleScheduleClick = async (professionalUser: any) => {
+    if (!user) {
       // Se não estiver logado, redirecionar para login
       navigate('/login')
+      return
+    }
+
+    // Prevenir múltiplas execuções simultâneas
+    if (isModalTransitioning) {
+      console.log('Modal já está sendo processado, ignorando clique')
+      return
+    }
+
+    try {
+      setIsModalTransitioning(true)
+      
+      // Fechar qualquer modal que esteja aberto PRIMEIRO
+      setShowScheduleModal(false)
+      setShowAgendaUnavailableModal(false)
+      
+      // Aguardar mais tempo para garantir que os modais foram fechados
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // Verificar status da agenda do profissional
+      const agendaStatus = await checkAgendaStatus()
+      
+      // Aguardar mais um pouco para garantir que o estado foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Se a agenda não está ativa, mostrar modal de agenda indisponível
+      if (!agendaStatus.hasServices || agendaStatus.isTrialExpired || !agendaStatus.hasActiveAgenda) {
+        setShowAgendaUnavailableModal(true)
+      } else {
+        // Se a agenda está ativa, abrir modal de agendamento normal
+        setShowScheduleModal(true)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status da agenda:', error)
+      // Em caso de erro, mostrar modal de agenda indisponível por segurança
+      setShowScheduleModal(false)
+      setShowAgendaUnavailableModal(true)
+    } finally {
+      // Sempre liberar o controle após um delay
+      setTimeout(() => {
+        setIsModalTransitioning(false)
+      }, 500)
     }
   }
 
@@ -728,10 +781,11 @@ const Perfil = () => {
                           variant="beauty"
                           size="sm"
                           onClick={() => handleScheduleClick(displayUser)}
+                          disabled={isModalTransitioning}
                           className="px-4 ml-2"
                         >
                           <Calendar className="h-4 w-4 mr-2" />
-                          Agendar
+                          {isModalTransitioning ? 'Processando...' : 'Agendar'}
                         </Button>
                       )}
                     </>
@@ -1749,17 +1803,45 @@ const Perfil = () => {
             onSkillsUpdated={handleSkillsUpdated} 
           />
 
-          {/* Modal de Agendamento */}
-          <ScheduleModal
-            isOpen={showScheduleModal}
-            onClose={() => setShowScheduleModal(false)}
-            professional={{
-              id: displayUser?.id || '',
-              name: displayUser?.name || 'Profissional',
-              profile_photo: displayUser?.profile_photo,
-              salon_id: undefined // Será determinado pelo modal
-            }}
-          />
+          {/* Modal de Agendamento - Só exibe se não há modal de agenda indisponível E não está em transição */}
+          {!showAgendaUnavailableModal && !isModalTransitioning && (
+            <ScheduleModal
+              isOpen={showScheduleModal}
+              onClose={() => {
+                setShowScheduleModal(false)
+                setIsModalTransitioning(false)
+              }}
+              professional={{
+                id: displayUser?.id || '',
+                name: displayUser?.name || 'Profissional',
+                profile_photo: displayUser?.profile_photo,
+                salon_id: undefined // Será determinado pelo modal
+              }}
+            />
+          )}
+
+          {/* Modal de Agenda Indisponível - Só exibe se não há modal de agendamento E não está em transição */}
+          {!showScheduleModal && !isModalTransitioning && (
+            <AgendaUnavailableModal
+              isOpen={showAgendaUnavailableModal}
+              onClose={() => {
+                setShowAgendaUnavailableModal(false)
+                setIsModalTransitioning(false)
+              }}
+              professional={{
+                id: displayUser?.id || '',
+                name: displayUser?.name || 'Profissional',
+                profile_photo: displayUser?.profile_photo,
+                phone: displayUser?.phone,
+                whatsapp: displayUser?.phone // Usar phone como whatsapp se não houver campo específico
+              }}
+              scenario={
+                !hasServices ? 'no_services' :
+                isTrialExpired && !hasActiveAgenda ? 'trial_expired' :
+                'agenda_disabled'
+              }
+            />
+          )}
 
         </div>
       </div>
