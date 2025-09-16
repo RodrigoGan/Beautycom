@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Calendar, Clock, CheckCircle, AlertCircle, Gift } from 'lucide-react'
 import { useAgendaActivation } from '@/hooks/useAgendaActivation'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 interface AgendaActivationCardProps {
   professionalId?: string
@@ -15,7 +16,7 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
   professionalId,
   onAgendaActivated
 }) => {
-  const { user } = useAuthContext()
+  const { user, refreshUser } = useAuthContext()
   const {
     loading,
     trialInfo,
@@ -26,23 +27,97 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
     deactivateAgenda
   } = useAgendaActivation(professionalId || user?.id)
 
+  // Estado local para controlar se a agenda está ativa (baseado no banco, não no contexto)
+  const [isAgendaActive, setIsAgendaActive] = useState(false)
+  const [isSalonOwner, setIsSalonOwner] = useState(false)
+  const [salonName, setSalonName] = useState<string | null>(null)
+
   useEffect(() => {
     if (professionalId || user?.id) {
       checkAgendaActivationStatus()
     }
   }, [professionalId, user?.id, checkAgendaActivationStatus])
 
+  // Verificar status da agenda diretamente do banco
+  useEffect(() => {
+    const checkAgendaStatus = async () => {
+      if (!professionalId && !user?.id) return
+      
+      const userId = professionalId || user?.id
+      
+      try {
+        // Verificar agenda profissional
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('agenda_enabled')
+          .eq('id', userId)
+          .single()
+        
+        if (!error && userData) {
+          setIsAgendaActive(userData.agenda_enabled || false)
+        }
+
+        // Verificar se é dono de salão com agenda ativa
+        const { data: salonData, error: salonError } = await supabase
+          .from('salons_studios')
+          .select('id, name')
+          .eq('owner_id', userId)
+          .single()
+
+        if (!salonError && salonData) {
+          setIsSalonOwner(true)
+          setSalonName(salonData.name)
+
+          // Verificar se tem agenda ativa no salão
+          const { data: salonProfessionalData, error: salonProfessionalError } = await supabase
+            .from('salon_professionals')
+            .select('agenda_enabled')
+            .eq('professional_id', userId)
+            .eq('salon_id', salonData.id)
+            .eq('status', 'accepted')
+            .single()
+
+          if (!salonProfessionalError && salonProfessionalData?.agenda_enabled) {
+            // Se é dono de salão com agenda ativa, considerar como agenda ativa
+            setIsAgendaActive(true)
+          }
+        } else {
+          setIsSalonOwner(false)
+          setSalonName(null)
+        }
+      } catch (err) {
+        console.warn('Erro ao verificar status da agenda:', err)
+      }
+    }
+
+    checkAgendaStatus()
+  }, [professionalId, user?.id, loading]) // Re-executar quando loading muda
+
   const handleActivateAgenda = async () => {
     const result = await activateAgenda()
     if (result.success) {
+      // Atualizar o contexto do usuário PRIMEIRO
+      await refreshUser()
+      // Aguardar um pouco para garantir que o contexto foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 100))
       // Recarregar status após ativação
       await checkAgendaActivationStatus()
-      // Chamar callback antes de recarregar
+      // Chamar callback
       if (onAgendaActivated) {
         onAgendaActivated()
       }
-      // Forçar recarregamento da página para atualizar o contexto
-      window.location.reload()
+    }
+  }
+
+  const handleDeactivateAgenda = async () => {
+    const result = await deactivateAgenda()
+    if (result.success) {
+      // Atualizar o contexto do usuário PRIMEIRO
+      await refreshUser()
+      // Aguardar um pouco para garantir que o contexto foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 100))
+      // Recarregar status após desativação
+      await checkAgendaActivationStatus()
     }
   }
 
@@ -63,7 +138,142 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
     return null
   }
 
-  // Se tem trial ativo (PRIORIDADE - mostra mesmo com agenda ativa)
+  // Se é dono de salão com agenda ativa, mostrar card especial
+  if (isSalonOwner && isAgendaActive && salonName) {
+    return (
+      <Card className="border-green-200 bg-green-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <CheckCircle className="h-5 w-5" />
+            Agenda do Salão Ativa
+          </CardTitle>
+          <CardDescription className="text-green-600">
+            Você é dono do salão "{salonName}" e sua agenda está ativa
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-green-100 text-green-700">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Salão Ativo
+            </Badge>
+            <span className="text-sm text-green-600">
+              Agenda do salão está funcionando
+            </span>
+          </div>
+          
+          <Button 
+            onClick={handleDeactivateAgenda}
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-700"
+          >
+            {loading ? 'Desativando...' : 'Desativar Agenda do Salão'}
+          </Button>
+          
+          <p className="text-xs text-green-500">
+            ✅ Como dono do salão, sua agenda profissional está ativa e você pode receber agendamentos
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se é dono de salão mas agenda está desativada
+  if (isSalonOwner && !isAgendaActive && salonName) {
+    return (
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-orange-700">
+            <Clock className="h-5 w-5" />
+            Agenda do Salão Pausada
+          </CardTitle>
+          <CardDescription className="text-orange-600">
+            Você é dono do salão "{salonName}" mas a agenda está pausada
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+              <Clock className="h-3 w-3 mr-1" />
+              Salão Pausado
+            </Badge>
+            <span className="text-sm text-orange-600">
+              Agenda do salão está pausada
+            </span>
+          </div>
+          
+          <Button 
+            onClick={handleActivateAgenda}
+            disabled={loading}
+            className="w-full bg-orange-600 hover:bg-orange-700"
+          >
+            {loading ? 'Ativando...' : 'Ativar Agenda do Salão'}
+          </Button>
+          
+          <p className="text-xs text-orange-500">
+            Reative a agenda profissional do salão para voltar a receber agendamentos
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se tem assinatura ativa (PRIORIDADE MÁXIMA)
+  if (subscriptionInfo) {
+    return (
+      <Card className="border-purple-200 bg-purple-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-purple-700">
+            <CheckCircle className="h-5 w-5" />
+            Assinatura Ativa
+          </CardTitle>
+          <CardDescription className="text-purple-600">
+            Plano: {subscriptionInfo.plan.name}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-purple-600" />
+              <span className="text-sm text-purple-600">
+                Válido até {formatDate(subscriptionInfo.current_period_end)}
+              </span>
+            </div>
+            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+              {subscriptionInfo.plan.max_professionals} profissionais
+            </Badge>
+          </div>
+          
+          {isAgendaActive ? (
+            <Button 
+              onClick={handleDeactivateAgenda}
+              disabled={loading}
+              className="w-full bg-red-600 hover:bg-red-700"
+            >
+              {loading ? 'Desativando...' : 'Desativar Agenda'}
+            </Button>
+          ) : canActivateAgenda ? (
+            <Button 
+              onClick={handleActivateAgenda}
+              disabled={loading}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              {loading ? 'Ativando...' : 'Ativar Agenda Online'}
+            </Button>
+          ) : null}
+          
+          <p className="text-xs text-purple-500">
+            {isAgendaActive 
+              ? "✅ Sua agenda está ativa e você pode receber agendamentos de clientes"
+              : "Ative sua agenda para começar a receber agendamentos"
+            }
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se tem trial ativo (sem assinatura)
   if (trialInfo && trialInfo.status === 'active') {
     const daysRemaining = getDaysRemaining(trialInfo.end_date)
     
@@ -91,17 +301,9 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
             </Badge>
           </div>
           
-          {user?.agenda_enabled ? (
+          {isAgendaActive ? (
             <Button 
-              onClick={async () => {
-                const result = await deactivateAgenda()
-                if (result.success) {
-                  // Recarregar status após desativação
-                  await checkAgendaActivationStatus()
-                  // Forçar recarregamento da página para atualizar o contexto
-                  window.location.reload()
-                }
-              }}
+              onClick={handleDeactivateAgenda}
               disabled={loading}
               className="w-full bg-red-600 hover:bg-red-700"
             >
@@ -118,7 +320,7 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
           ) : null}
           
           <p className="text-xs text-blue-500">
-            {user?.agenda_enabled 
+            {isAgendaActive 
               ? "✅ Sua agenda está ativa e você pode receber agendamentos de clientes"
               : "Após ativar, você poderá receber agendamentos de clientes"
             }
@@ -128,8 +330,8 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
     )
   }
 
-  // Se já tem agenda ativa (sem trial ativo)
-  if (user?.agenda_enabled) {
+  // Se já tem agenda ativa (sem trial nem assinatura ativos)
+  if (isAgendaActive) {
     return (
       <Card className="border-green-200 bg-green-50">
         <CardHeader className="pb-3">
@@ -141,7 +343,7 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
             Sua agenda está ativa e você pode receber agendamentos
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="bg-green-100 text-green-700">
               <CheckCircle className="h-3 w-3 mr-1" />
@@ -151,13 +353,21 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
               Você está recebendo agendamentos
             </span>
           </div>
+          
+          <Button 
+            onClick={handleDeactivateAgenda}
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-700"
+          >
+            {loading ? 'Desativando...' : 'Desativar Agenda'}
+          </Button>
         </CardContent>
       </Card>
     )
   }
 
   // Se agenda está desativada mas tem trial ativo
-  if (trialInfo && trialInfo.status === 'active' && !user?.agenda_enabled) {
+  if (trialInfo && trialInfo.status === 'active' && !isAgendaActive) {
     const daysRemaining = getDaysRemaining(trialInfo.end_date)
     
     return (
@@ -195,46 +405,6 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
           <p className="text-xs text-orange-500">
             Reative sua agenda para voltar a receber agendamentos
           </p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Se tem assinatura ativa
-  if (subscriptionInfo) {
-    return (
-      <Card className="border-purple-200 bg-purple-50">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-purple-700">
-            <CheckCircle className="h-5 w-5" />
-            Assinatura Ativa
-          </CardTitle>
-          <CardDescription className="text-purple-600">
-            Plano: {subscriptionInfo.plan.name}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-purple-600" />
-              <span className="text-sm text-purple-600">
-                Válido até {formatDate(subscriptionInfo.current_period_end)}
-              </span>
-            </div>
-            <Badge variant="secondary" className="bg-purple-100 text-purple-700">
-              {subscriptionInfo.plan.max_professionals} profissionais
-            </Badge>
-          </div>
-          
-          {canActivateAgenda && (
-            <Button 
-              onClick={handleActivateAgenda}
-              disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-            >
-              {loading ? 'Ativando...' : 'Ativar Agenda Online'}
-            </Button>
-          )}
         </CardContent>
       </Card>
     )
