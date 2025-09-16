@@ -27,6 +27,8 @@ import AgendaCompleta from "./pages/AgendaCompleta";
 import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
 import AreaAdministrativa from "./pages/AreaAdministrativa";
+import AdminWhatsApp from "./pages/AdminWhatsApp";
+import { SuperAdminRoute } from "./components/SuperAdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +75,13 @@ const App = () => {
             <Route path="/area-administrativa" element={
               <ProtectedRoute>
                 <AreaAdministrativa />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/whatsapp-campaigns" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminWhatsApp />
+                </SuperAdminRoute>
               </ProtectedRoute>
             } />
             <Route path="/novo-agendamento" element={
