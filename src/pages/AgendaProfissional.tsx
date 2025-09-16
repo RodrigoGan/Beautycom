@@ -14,6 +14,8 @@ import { useSalonEmployees } from "@/hooks/useSalonEmployees"
 import { useEffect, useState, useCallback } from "react"
 import { PERMISSION_CATEGORIES } from "@/config/permissionCategories"
 import { SubscriptionSummaryCard } from "@/components/SubscriptionSummaryCard"
+import { AgendaConfigurationModal } from "@/components/AgendaConfigurationModal"
+import { useAgendaConfigurationModal } from "@/hooks/useAgendaConfigurationModal"
 
 const AgendaProfissional = () => {
   const { user } = useAuthContext()
@@ -22,6 +24,17 @@ const AgendaProfissional = () => {
   const { appointments, loading: appointmentsLoading, fetchAppointments, todayAppointments, upcomingAppointments } = useAppointments()
   const { professionals, loading: professionalsLoading, fetchProfessionals, enableAgenda, disableAgenda } = useSalonProfessionals(userSalon?.id || null)
   const { employees, loading: employeesLoading, fetchEmployees, updateEmployee } = useSalonEmployees(userSalon?.id || null)
+  
+  // Modal de configuração da agenda
+  const {
+    showModal,
+    daysRemaining,
+    missingItems,
+    loading: modalLoading,
+    handleConfigureNow,
+    handleRemindLater,
+    handleClose
+  } = useAgendaConfigurationModal(user?.id)
   
   // Estados para o modal de adicionar gestor
   const [showAddManagerModal, setShowAddManagerModal] = useState(false)
@@ -210,8 +223,6 @@ const AgendaProfissional = () => {
       await fetchProfessionals()
       await reloadAppointments()
       // Recarregar card de assinatura
-      console.log('🔄 Dados recarregados - página NÃO recarregada para debug')
-      // window.location.reload() // REMOVIDO TEMPORARIAMENTE PARA DEBUG
     } else {
       // Toast de erro seria mostrado aqui
       console.error('❌ Erro ao habilitar agenda:', result.error)
@@ -230,8 +241,6 @@ const AgendaProfissional = () => {
       await fetchProfessionals()
       await reloadAppointments()
       // Recarregar card de assinatura
-      console.log('🔄 Dados recarregados - página NÃO recarregada para debug')
-      // window.location.reload() // REMOVIDO TEMPORARIAMENTE PARA DEBUG
     } else {
       // Toast de erro seria mostrado aqui
       console.error('❌ Erro ao desabilitar agenda:', result.error)
@@ -1107,6 +1116,16 @@ const AgendaProfissional = () => {
 
                 {/* Modais de Gestores - REMOVIDOS (não há mais sistema de permissões) */}
       </div>
+      
+      {/* Modal de Configuração da Agenda */}
+      <AgendaConfigurationModal
+        isOpen={showModal}
+        onClose={handleClose}
+        onConfigureNow={handleConfigureNow}
+        onRemindLater={handleRemindLater}
+        daysRemaining={daysRemaining}
+        missingItems={missingItems}
+      />
     </div>
   );
 };

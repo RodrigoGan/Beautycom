@@ -448,46 +448,9 @@ export const useSalonProfessionals = (salonId: string | null) => {
         throw userUpdateError
       }
 
-      // 3. Remover o profissional da subscription_professionals
-      // Primeiro, buscar a assinatura ativa do dono do salão
-      if (!salonId) {
-        console.error('❌ salonId é null, pulando busca do dono do salão')
-        return { success: true, data: updateData }
-      }
-      
-      const { data: salonData } = await supabase
-        .from('salons_studios')
-        .select('owner_id')
-        .eq('id', salonId)
-        .single()
-
-      if (salonData?.owner_id) {
-        // Buscar a assinatura ativa do dono
-        const { data: subscriptionData } = await supabase
-          .from('user_subscriptions')
-          .select('id')
-          .eq('user_id', salonData.owner_id)
-          .eq('status', 'active')
-          .single()
-
-        if (subscriptionData) {
-          // Remover o profissional da subscription_professionals
-          const { error: subscriptionError } = await supabase
-            .from('subscription_professionals')
-            .delete()
-            .eq('subscription_id', subscriptionData.id)
-            .eq('professional_id', professionalId)
-
-          if (subscriptionError) {
-            console.error('❌ Erro ao remover da subscription_professionals:', subscriptionError)
-            // Não falhar a operação por causa disso, apenas logar
-          } else {
-            console.log('✅ Profissional removido da subscription_professionals')
-          }
-        }
-      }
-
-      console.log('✅ Agenda desabilitada no banco (salon_professionals, users e subscription_professionals):', updateData)
+      // 3. NÃO remover o profissional da subscription_professionals
+      // ✅ MANTÉM O VÍNCULO COM O SALÃO - APENAS PAUSA A AGENDA
+      console.log('✅ Agenda pausada (salon_professionals e users) - vínculo com salão mantido:', updateData)
 
       // 4. Buscar dados atualizados do profissional
       const { data: usersData } = await supabase

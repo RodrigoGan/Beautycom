@@ -31,7 +31,6 @@ export const useStripe = () => {
       // Verificar se a chave pública do Stripe está configurada
       const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
       
-      console.log('🔍 DEBUG Stripe Keys:');
       console.log('  - stripePublishableKey:', stripePublishableKey ? `${stripePublishableKey.substring(0, 20)}...` : 'undefined');
       console.log('  - import.meta.env keys:', Object.keys(import.meta.env).filter(key => key.includes('STRIPE')));
       

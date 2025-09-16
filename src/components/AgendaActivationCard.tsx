@@ -22,7 +22,8 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
     subscriptionInfo,
     canActivateAgenda,
     checkAgendaActivationStatus,
-    activateAgenda
+    activateAgenda,
+    deactivateAgenda
   } = useAgendaActivation(professionalId || user?.id)
 
   useEffect(() => {
@@ -33,8 +34,15 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
 
   const handleActivateAgenda = async () => {
     const result = await activateAgenda()
-    if (result.success && onAgendaActivated) {
-      onAgendaActivated()
+    if (result.success) {
+      // Recarregar status após ativação
+      await checkAgendaActivationStatus()
+      // Chamar callback antes de recarregar
+      if (onAgendaActivated) {
+        onAgendaActivated()
+      }
+      // Forçar recarregamento da página para atualizar o contexto
+      window.location.reload()
     }
   }
 
@@ -55,35 +63,7 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
     return null
   }
 
-  // Se já tem agenda ativa
-  if (user?.agenda_enabled) {
-    return (
-      <Card className="border-green-200 bg-green-50">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-green-700">
-            <CheckCircle className="h-5 w-5" />
-            Agenda Online Ativa
-          </CardTitle>
-          <CardDescription className="text-green-600">
-            Sua agenda está ativa e você pode receber agendamentos
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="bg-green-100 text-green-700">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Ativa
-            </Badge>
-            <span className="text-sm text-green-600">
-              Você está recebendo agendamentos
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Se tem trial ativo
+  // Se tem trial ativo (PRIORIDADE - mostra mesmo com agenda ativa)
   if (trialInfo && trialInfo.status === 'active') {
     const daysRemaining = getDaysRemaining(trialInfo.end_date)
     
@@ -111,7 +91,23 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
             </Badge>
           </div>
           
-          {canActivateAgenda && (
+          {user?.agenda_enabled ? (
+            <Button 
+              onClick={async () => {
+                const result = await deactivateAgenda()
+                if (result.success) {
+                  // Recarregar status após desativação
+                  await checkAgendaActivationStatus()
+                  // Forçar recarregamento da página para atualizar o contexto
+                  window.location.reload()
+                }
+              }}
+              disabled={loading}
+              className="w-full bg-red-600 hover:bg-red-700"
+            >
+              {loading ? 'Desativando...' : 'Desativar Agenda'}
+            </Button>
+          ) : canActivateAgenda ? (
             <Button 
               onClick={handleActivateAgenda}
               disabled={loading}
@@ -119,10 +115,85 @@ export const AgendaActivationCard: React.FC<AgendaActivationCardProps> = ({
             >
               {loading ? 'Ativando...' : 'Ativar Agenda Online'}
             </Button>
-          )}
+          ) : null}
           
           <p className="text-xs text-blue-500">
-            Após ativar, você poderá receber agendamentos de clientes
+            {user?.agenda_enabled 
+              ? "✅ Sua agenda está ativa e você pode receber agendamentos de clientes"
+              : "Após ativar, você poderá receber agendamentos de clientes"
+            }
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se já tem agenda ativa (sem trial ativo)
+  if (user?.agenda_enabled) {
+    return (
+      <Card className="border-green-200 bg-green-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <CheckCircle className="h-5 w-5" />
+            Agenda Online Ativa
+          </CardTitle>
+          <CardDescription className="text-green-600">
+            Sua agenda está ativa e você pode receber agendamentos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-green-100 text-green-700">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Ativa
+            </Badge>
+            <span className="text-sm text-green-600">
+              Você está recebendo agendamentos
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se agenda está desativada mas tem trial ativo
+  if (trialInfo && trialInfo.status === 'active' && !user?.agenda_enabled) {
+    const daysRemaining = getDaysRemaining(trialInfo.end_date)
+    
+    return (
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-orange-700">
+            <Clock className="h-5 w-5" />
+            Agenda Pausada
+          </CardTitle>
+          <CardDescription className="text-orange-600">
+            Sua agenda está pausada. Você tem {daysRemaining} dias restantes no seu trial
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-orange-600" />
+              <span className="text-sm text-orange-600">
+                Válido até {formatDate(trialInfo.end_date)}
+              </span>
+            </div>
+            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+              {daysRemaining} dias restantes
+            </Badge>
+          </div>
+          
+          <Button 
+            onClick={handleActivateAgenda}
+            disabled={loading}
+            className="w-full bg-orange-600 hover:bg-orange-700"
+          >
+            {loading ? 'Ativando...' : 'Ativar Agenda Online'}
+          </Button>
+          
+          <p className="text-xs text-orange-500">
+            Reative sua agenda para voltar a receber agendamentos
           </p>
         </CardContent>
       </Card>

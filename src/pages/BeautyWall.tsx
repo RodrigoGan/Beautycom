@@ -32,11 +32,24 @@ import VideoModal from "@/components/VideoModal"
 import { Header } from "@/components/Header"
 import { OptimizedImage } from '@/components/OptimizedImage'
 import { useLoopDetection } from '@/utils/loopDetector'
+import { AgendaConfigurationModal } from "@/components/AgendaConfigurationModal"
+import { useAgendaConfigurationModal } from "@/hooks/useAgendaConfigurationModal"
 
 const BeautyWall = () => {
   const { user } = useAuthContext()
   const navigate = useNavigate()
   const loopDetection = useLoopDetection('BeautyWall')
+  
+  // Modal de configuração da agenda (só para profissionais)
+  const {
+    showModal,
+    daysRemaining,
+    missingItems,
+    loading: modalLoading,
+    handleConfigureNow,
+    handleRemindLater,
+    handleClose
+  } = useAgendaConfigurationModal(user?.id) // Sempre passar o ID, o hook vai verificar se é profissional
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [selectedPost, setSelectedPost] = useState<any>(null)
   
@@ -432,7 +445,6 @@ const BeautyWall = () => {
           isVideo = firstMedia.type === 'video' || (imagemUrl && (imagemUrl.includes('.mp4') || imagemUrl.includes('.mov') || imagemUrl.includes('.avi')))
           
           // NÃO detectar carrossel automaticamente no fallback
-          console.log('DEBUG: Post fallback -', post.media_urls.media.length, 'mídias')
         }
         break
     }
@@ -1663,6 +1675,16 @@ const BeautyWall = () => {
         videoUrl={selectedVideo}
         isOpen={showVideoModal}
         onClose={handleCloseVideoModal}
+      />
+      
+      {/* Modal de Configuração da Agenda (só para profissionais) */}
+      <AgendaConfigurationModal
+        isOpen={showModal}
+        onClose={handleClose}
+        onConfigureNow={handleConfigureNow}
+        onRemindLater={handleRemindLater}
+        daysRemaining={daysRemaining}
+        missingItems={missingItems}
       />
     </div>
   );

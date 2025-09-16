@@ -342,23 +342,48 @@ const ConfiguracoesAgenda = () => {
   }
 
   const handleDeleteService = async (serviceId: string) => {
-    if (confirm('Tem certeza que deseja deletar este serviço?')) {
-      try {
-        await deleteService(serviceId)
-        toast({
-          title: "Sucesso!",
-          description: "Serviço deletado com sucesso",
-          variant: "default"
-        })
-      } catch (error) {
-        console.error('Erro ao deletar serviço:', error)
-        toast({
-          title: "Erro",
-          description: error instanceof Error ? translateError(error.message) : "Erro ao deletar serviço",
-          variant: "destructive"
-        })
-      }
-    }
+    // Usar toast com ação de confirmação em vez de confirm() nativo
+    toast({
+      title: "Confirmar exclusão",
+      description: "Tem certeza que deseja deletar este serviço?",
+      action: (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={async () => {
+              try {
+                await deleteService(serviceId)
+                toast({
+                  title: "Sucesso!",
+                  description: "Serviço deletado com sucesso",
+                  variant: "default"
+                })
+              } catch (error) {
+                console.error('Erro ao deletar serviço:', error)
+                toast({
+                  title: "Erro",
+                  description: error instanceof Error ? translateError(error.message) : "Erro ao deletar serviço",
+                  variant: "destructive"
+                })
+              }
+            }}
+          >
+            Sim, deletar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // Fechar toast de confirmação
+            }}
+          >
+            Cancelar
+          </Button>
+        </div>
+      ),
+      duration: 10000, // 10 segundos para dar tempo de decidir
+    })
   }
 
 

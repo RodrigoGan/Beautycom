@@ -48,7 +48,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       const newPermissions: Record<string, boolean> = {}
       
       if (employee.permissions) {
-        console.log('🔍 DEBUG - Permissões originais:', employee.permissions)
         
         // Verificar se já está no novo formato (permissões simples)
         const hasOldFormat = employee.permissions && 
@@ -70,7 +69,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
           setCustomPermissions(newPermissions)
         }
         
-        console.log('🔍 DEBUG - Permissões convertidas:', newPermissions)
       } else {
         // Se não há permissões, usar permissões padrão do cargo
         const defaultPermissions = getAllPermissions()
@@ -82,7 +80,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         })
         
         setCustomPermissions(rolePermissions)
-        console.log('🔍 DEBUG - Permissões padrão aplicadas:', rolePermissions)
       }
       
       // NÃO expandir categoria por padrão - deixar todas fechadas
@@ -136,7 +133,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       const finalRole = selectedRole === 'other' ? 'other' : selectedRole
       const roleDescription = selectedRole === 'other' ? customRoleDescription.trim() : undefined
       
-      console.log('🔍 DEBUG - Dados para atualizar funcionário:', {
         employeeId: employee.id,
         role: finalRole,
         roleDescription,
@@ -145,7 +141,6 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       
       const result = await updateEmployee(employee.id, finalRole, validatedPermissions, roleDescription)
       
-      console.log('🔍 DEBUG - Resultado da atualização:', result)
       
       if (result.success) {
         toast({

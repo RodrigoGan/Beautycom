@@ -139,7 +139,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       const finalRole = selectedRole === 'other' ? 'other' : selectedRole
       const roleDescription = selectedRole === 'other' ? customRoleDescription.trim() : undefined
       
-      console.log('🔍 DEBUG - Dados para adicionar funcionário:', {
         userId: selectedUser.id,
         role: finalRole,
         roleDescription,
@@ -149,7 +148,6 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       
       const result = await addEmployee(selectedUser.id, finalRole, validatedPermissions, roleDescription)
       
-      console.log('🔍 DEBUG - Resultado da adição:', result)
       
       if (result.success) {
         toast({

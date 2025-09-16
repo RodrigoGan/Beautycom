@@ -27,13 +27,10 @@ import AgendaCompleta from "./pages/AgendaCompleta";
 import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
 import AreaAdministrativa from "./pages/AreaAdministrativa";
-// import { PerformanceDebug, usePerformanceDebug } from "./components/PerformanceDebug"; // DESABILITADO para reduzir requisições
-// import { SalonDebug } from "./components/SalonDebug";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  // const { isVisible: debugVisible } = usePerformanceDebug() // DESABILITADO
   
   return (
     <QueryClientProvider client={queryClient}>

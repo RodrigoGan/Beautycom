@@ -104,9 +104,6 @@ export const WorkplaceCard = ({ targetUserId }: { targetUserId?: string }) => {
       // Criar mapa de salões únicos com os vínculos do usuário atual
       const salonsMap = new Map()
 
-      console.log('🔍 DEBUG - Salões próprios:', ownedSalonsData?.length || 0)
-      console.log('🔍 DEBUG - Funcionários:', employeesData?.length || 0)
-      console.log('🔍 DEBUG - Profissionais:', professionalsData?.length || 0)
 
       // Adicionar salões próprios (usuário é proprietário)
       ownedSalonsData?.forEach(salon => {

@@ -239,7 +239,6 @@ export const useSalonEmployees = (salonId: string | null) => {
         updates.role_description = roleDescription
       }
 
-      console.log('🔍 DEBUG - Dados para update:', updates)
 
       const { data, error } = await supabase
         .from('salon_employees')
@@ -252,7 +251,6 @@ export const useSalonEmployees = (salonId: string | null) => {
         `)
         .single()
 
-      console.log('🔍 DEBUG - Resposta do Supabase:', { data, error })
 
       if (error) {
         console.error('❌ Erro ao atualizar funcionário:', error)

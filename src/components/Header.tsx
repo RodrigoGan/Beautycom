@@ -5,7 +5,6 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useSalons } from "@/hooks/useSalons"
-// import { useSalonPermissions } from "@/hooks/useSalonPermissions" // REMOVIDO TEMPORARIAMENTE
 // import { useSalonProfessionals } from "@/hooks/useSalonProfessionals" // REMOVIDO - não utilizado
 import { supabase } from "@/lib/supabase"
 import { NotificationDropdown } from "@/components/NotificationDropdown"
@@ -25,9 +24,8 @@ export function Header() {
   // Lógica de permissões restaurada
   const isOwner = () => user?.id === userSalon?.owner_id
   const hasPermission = (permission: string) => isOwner() // Apenas donos têm todas as permissões
-  const isEmployee = () => false // REMOVIDO TEMPORARIAMENTE
+  const isEmployee = () => false
   
-  // Hook para buscar TODOS os salões onde o usuário é profissional - REMOVIDO TEMPORARIAMENTE
   // const [userAsProfessional, setUserAsProfessional] = useState<any[]>([])
   // const [userAsProfessionalLoading, setUserAsProfessionalLoading] = useState(false)
   
@@ -96,7 +94,6 @@ export function Header() {
     setIsMenuOpen(false)
   }, [location.pathname])
 
-  // Função para buscar salões onde o usuário é profissional - REMOVIDO TEMPORARIAMENTE
   // const fetchUserAsProfessional = useCallback(async () => {
   //   if (!user?.id) return
   //   
@@ -131,7 +128,6 @@ export function Header() {
 
   // Debug removido para evitar loops
 
-  // Executar busca de salões onde usuário é profissional - REMOVIDO TEMPORARIAMENTE
   // useEffect(() => {
   //   if (user?.id) {
   //     fetchUserAsProfessional()

@@ -198,7 +198,6 @@ export const usePosts = () => {
         
         // Log específico para debugar "Sobrancelhas / Cílios"
         if (filtersToUse.category === 'Sobrancelhas / Cílios') {
-          console.log('🔍 DEBUG: Categoria "Sobrancelhas / Cílios" detectada')
         }
         
         // Buscar categoria por nome e usar o ID
@@ -222,7 +221,6 @@ export const usePosts = () => {
           
           // Log específico para "Sobrancelhas / Cílios"
           if (filtersToUse.category === 'Sobrancelhas / Cílios') {
-            console.log('🔍 DEBUG: Aplicando filtro para Sobrancelhas / Cílios com ID:', categoryData.id)
           }
           
           query = query.eq('category_id', categoryData.id)
@@ -240,13 +238,10 @@ export const usePosts = () => {
           
           // Log específico para "Sobrancelhas / Cílios"
           if (filtersToUse.category === 'Sobrancelhas / Cílios') {
-            console.log('🔍 DEBUG: Categoria "Sobrancelhas / Cílios" não encontrada no banco')
-            console.log('🔍 DEBUG: Verificando se existe variação do nome...')
             const sobrancelhasCategory = allCategories?.find(c => 
               c.name.includes('Sobrancelhas') || c.name.includes('Cílios')
             )
             if (sobrancelhasCategory) {
-              console.log('🔍 DEBUG: Encontrada categoria similar:', sobrancelhasCategory)
             }
           }
         }
