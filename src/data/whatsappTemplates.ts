@@ -17,15 +17,14 @@ export const whatsappTemplates: WhatsAppTemplate[] = [
     variables: ['NOME', 'DIAS_RESTANTES', 'LINK_AGENDA'],
     content: `🎉 Olá [NOME]!
 
-Bem-vindo(a) à Beautycom! 
-
-Obrigado por se cadastrar em nossa plataforma. Você tem [DIAS_RESTANTES] dias restantes no seu trial gratuito para experimentar nossa agenda online.
+Bem-vindo(a) à Beautycom, a Rede Social da Beleza com o melhor agendador eletrônico do Brasil!
+E você se cadastrou gratuitamente!
+Desfrute desse Rede Social que é dedicada à área da beleza, publique seus trabalhos para ser facilmente encontrado, e aproveite, pois você tem [DIAS_RESTANTES] dias restantes no seu trial gratuito para experimentar nossa agenda online.
 
 ✨ Durante este período você pode:
 • Configurar sua agenda profissional
 • Receber agendamentos de clientes
 • Testar todas as funcionalidades
-• Conhecer nossa rede social da beleza
 
 ⏰ Não perca esta oportunidade! Configure sua agenda agora e comece a receber seus primeiros agendamentos.
 

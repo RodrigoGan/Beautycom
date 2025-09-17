@@ -20,7 +20,7 @@ export const useSuperAdminAccess = () => {
     }
     
     // Fallback de segurança: email específico (apenas para desenvolvimento/emergência)
-    if (user.email === 'rodrigo_gan@hotmail.com') {
+    if (user.email === 'rodrigo_gan@hotmail.com' || user.email === 'ricardo@moveisforty.com.br') {
       return true
     }
     

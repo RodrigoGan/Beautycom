@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Menu, X, Bell, User, LogOut, Building2 } from "lucide-react"
+import { Menu, X, Bell, User, LogOut, Building2, MessageSquare } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuthContext } from "@/contexts/AuthContext"
 import { useSalons } from "@/hooks/useSalons"
+import { useSuperAdminAccess } from "@/hooks/useSuperAdminAccess"
 // import { useSalonProfessionals } from "@/hooks/useSalonProfessionals" // REMOVIDO - não utilizado
 import { supabase } from "@/lib/supabase"
 import { NotificationDropdown } from "@/components/NotificationDropdown"
@@ -15,6 +16,7 @@ export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, signOut } = useAuthContext()
+  const { isSuperAdmin } = useSuperAdminAccess()
   const isLoggedIn = !!user
   const menuRef = useRef<HTMLDivElement>(null)
   
@@ -157,6 +159,22 @@ export function Header() {
                 {/* Sistema de Notificações */}
                 <NotificationDropdown salonId={userSalon?.id} />
                 
+                {/* Botão WhatsApp Admin - Apenas para Super Admins */}
+                {isSuperAdmin && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="hidden sm:flex items-center gap-2"
+                    title="Campanhas WhatsApp"
+                  >
+                    <Link to="/admin/whatsapp-campaigns">
+                      <MessageSquare className="h-4 w-4" />
+                      <span className="hidden md:inline">WhatsApp</span>
+                    </Link>
+                  </Button>
+                )}
+                
                 {/* Nome do Usuário */}
                 <span className="hidden sm:inline text-sm text-muted-foreground">
                   Olá, {user?.name || user?.nickname || 'Usuário'}
@@ -216,6 +234,14 @@ export function Header() {
                     )}
                     <Link to="/membros" className="block px-2 py-2 text-sm hover:bg-accent rounded">Membros</Link>
                     <Link to="/beautywall" className="block px-2 py-2 text-sm hover:bg-accent rounded">BeautyWall</Link>
+                    
+                    {/* WhatsApp Admin - Apenas para Super Admins */}
+                    {isSuperAdmin && (
+                      <Link to="/admin/whatsapp-campaigns" className="block px-2 py-2 text-sm hover:bg-accent rounded flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Campanhas WhatsApp
+                      </Link>
+                    )}
                   </div>
                 </div>
 

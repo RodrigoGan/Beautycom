@@ -24,8 +24,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/contexts/AuthContext'
-import { useWhatsAppAutomation } from '@/hooks/useWhatsAppAutomation'
-import { WhatsAppMessage } from '@/api/whatsapp'
+import { useToast } from '@/hooks/use-toast'
+// Removido: useWhatsAppAutomation e WhatsAppMessage (sistema Puppeteer)
 import { whatsappTemplates, getTemplatesByCategory, WhatsAppTemplate } from '@/data/whatsappTemplates'
 
 /**
@@ -34,6 +34,7 @@ import { whatsappTemplates, getTemplatesByCategory, WhatsAppTemplate } from '@/d
  */
 const AdminWhatsApp: React.FC = () => {
   const { user } = useAuthContext()
+  const { toast } = useToast()
   const [professionals, setProfessionals] = useState<any[]>([])
   const [filteredProfessionals, setFilteredProfessionals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,17 +45,8 @@ const AdminWhatsApp: React.FC = () => {
   const [templateCategory, setTemplateCategory] = useState<'profissional' | 'usuario' | 'geral' | 'all'>('all')
   const [nameFilter, setNameFilter] = useState('')
   
-  // Hook de automação WhatsApp
-  const {
-    status: automationStatus,
-    lastResult,
-    initialize: initWhatsApp,
-    checkLoginStatus,
-    sendBulkMessages,
-    stopCampaign,
-    restart: restartWhatsApp,
-    close: closeWhatsApp
-  } = useWhatsAppAutomation()
+  // Sistema simplificado - sem Puppeteer
+  const [selectedClient, setSelectedClient] = useState<any>(null)
   const [filters, setFilters] = useState({
     userType: 'profissional',
     hasPhone: true,
@@ -73,15 +65,14 @@ const AdminWhatsApp: React.FC = () => {
   // Template de mensagem padrão
   const defaultMessage = `🎉 Olá [NOME]!
 
-Bem-vindo(a) à Beautycom! 
-
-Obrigado por se cadastrar em nossa plataforma. Você tem [DIAS_RESTANTES] dias restantes no seu trial gratuito para experimentar nossa agenda online.
+Bem-vindo(a) à Beautycom, a Rede Social da Beleza com o melhor agendador eletrônico do Brasil!
+E você se cadastrou gratuitamente!
+Desfrute desse Rede Social que é dedicada à área da beleza, publique seus trabalhos para ser facilmente encontrado, e aproveite, pois você tem [DIAS_RESTANTES] dias restantes no seu trial gratuito para experimentar nossa agenda online.
 
 ✨ Durante este período você pode:
 • Configurar sua agenda profissional
 • Receber agendamentos de clientes
 • Testar todas as funcionalidades
-• Conhecer nossa rede social da beleza
 
 ⏰ Não perca esta oportunidade! Configure sua agenda agora e comece a receber seus primeiros agendamentos.
 
@@ -89,7 +80,7 @@ Obrigado por se cadastrar em nossa plataforma. Você tem [DIAS_RESTANTES] dias r
 
 Precisa de ajuda? Estamos aqui para você!
 
-Equipe Beautycom 💄`
+Equipe Beautycom ✨`
 
   // Carregar profissionais
   useEffect(() => {
@@ -308,7 +299,48 @@ Equipe Beautycom 💄`
     return getTemplatesByCategory(templateCategory)
   }
 
-  const handleSendCampaign = async () => {
+  // Função para abrir WhatsApp com mensagem personalizada
+  const openWhatsAppWithMessage = (professional: any) => {
+    if (!professional.phone) {
+      toast({
+        title: "Erro",
+        description: "Profissional não possui telefone cadastrado",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!message.trim()) {
+      toast({
+        title: "Erro",
+        description: "Digite uma mensagem antes de enviar",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Personalizar mensagem
+    const personalizedMessage = personalizeMessage(message, professional)
+    
+    // Formatar telefone (remover caracteres especiais e adicionar código do país)
+    const formattedPhone = professional.phone.replace(/\D/g, '')
+    const phoneWithCountryCode = formattedPhone.startsWith('55') ? formattedPhone : `55${formattedPhone}`
+    
+    // Criar URL do WhatsApp
+    const whatsappUrl = `https://wa.me/${phoneWithCountryCode}?text=${encodeURIComponent(personalizedMessage)}`
+    
+    // Abrir WhatsApp em nova aba
+    window.open(whatsappUrl, '_blank')
+    
+    toast({
+      title: "WhatsApp Aberto",
+      description: `Mensagem preparada para ${professional.name}`,
+      variant: "default"
+    })
+  }
+
+  // Função para enviar para múltiplos clientes (abre um por vez)
+  const handleSendToSelected = () => {
     if (selectedProfessionals.size === 0) {
       toast({
         title: "Erro",
@@ -327,58 +359,24 @@ Equipe Beautycom 💄`
       return
     }
 
-    // Verificar se WhatsApp está inicializado
-    if (!automationStatus.isInitialized) {
-      toast({
-        title: "WhatsApp Não Inicializado",
-        description: "Clique em 'Inicializar WhatsApp' primeiro",
-        variant: "destructive"
-      })
-      return
-    }
-
-    // Verificar se está logado
-    if (!automationStatus.isLoggedIn) {
-      toast({
-        title: "WhatsApp Não Conectado",
-        description: "Aguarde o login ou reinicie o WhatsApp",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setSending(true)
-    try {
-      // Preparar mensagens
-      const selectedList = Array.from(selectedProfessionals)
-      const selectedData = filteredProfessionals.filter(p => selectedList.includes(p.id))
+    const selectedList = Array.from(selectedProfessionals)
+    const selectedData = filteredProfessionals.filter(p => selectedList.includes(p.id))
+    
+    // Abrir WhatsApp para o primeiro cliente selecionado
+    const firstClient = selectedData[0]
+    if (firstClient) {
+      openWhatsAppWithMessage(firstClient)
       
-      const messages: WhatsAppMessage[] = selectedData.map(professional => ({
-        phone: professional.phone,
-        message: personalizeMessage(message, professional),
-        professionalId: professional.id,
-        professionalName: professional.name || professional.email.split('@')[0]
-      }))
-
-      // Enviar campanha
-      const result = await sendBulkMessages(messages, {
-        delayBetweenMessages: 10000, // 10 segundos entre mensagens
-        maxRetries: 2
-      })
-
-      // Limpar seleção e mensagem
-      setSelectedProfessionals(new Set())
-      setMessage('')
+      // Remover o primeiro da seleção
+      const newSelected = new Set(selectedProfessionals)
+      newSelected.delete(firstClient.id)
+      setSelectedProfessionals(newSelected)
       
-    } catch (error) {
-      console.error('Erro ao enviar campanha:', error)
       toast({
-        title: "Erro na Campanha",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive"
+        title: "Próximo Cliente",
+        description: `Envie a mensagem e volte para o próximo cliente (${newSelected.size} restantes)`,
+        variant: "default"
       })
-    } finally {
-      setSending(false)
     }
   }
   
@@ -596,82 +594,52 @@ Equipe Beautycom 💄`
             </CardContent>
           </Card>
           
-          {/* Controle WhatsApp */}
+          {/* Instruções de Uso */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
-                Controle WhatsApp
-                <Badge 
-                  variant={automationStatus.isLoggedIn ? "default" : "destructive"}
-                  className="ml-2"
-                >
-                  {automationStatus.isInitialized 
-                    ? (automationStatus.isLoggedIn ? "Conectado" : "Aguardando Login")
-                    : "Desconectado"
-                  }
-                </Badge>
+                Como Usar
               </CardTitle>
               <CardDescription>
-                🚀 Sistema Real - Envio de mensagens via WhatsApp Web
+                📱 Sistema Simplificado - Abertura direta do WhatsApp Web
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!automationStatus.isInitialized ? (
-                <Button 
-                  onClick={initWhatsApp}
-                  className="w-full"
-                  disabled={automationStatus.isSending}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Inicializar WhatsApp
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={checkLoginStatus}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      Verificar Status
-                    </Button>
-                    <Button 
-                      onClick={restartWhatsApp}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reiniciar
-                    </Button>
-                    <Button 
-                      onClick={closeWhatsApp}
-                      variant="destructive"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Square className="mr-2 h-4 w-4" />
-                      Fechar
-                    </Button>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                  <div>
+                    <strong>Selecione os clientes</strong> que deseja enviar mensagem
                   </div>
-                  
-                  {automationStatus.isSending && (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Enviando mensagens... {automationStatus.progress.current}/{automationStatus.progress.total}
-                        {automationStatus.progress.currentMessage && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Atual: {automationStatus.progress.currentMessage.professionalName}
-                          </div>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
-              )}
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                  <div>
+                    <strong>Escolha um template</strong> ou digite sua mensagem personalizada
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                  <div>
+                    <strong>Clique em "Enviar"</strong> - o WhatsApp Web abrirá automaticamente
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                  <div>
+                    <strong>Confirme e envie</strong> a mensagem no WhatsApp
+                  </div>
+                </div>
+              </div>
+              
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Dica:</strong> Para múltiplos clientes, o sistema abrirá um por vez. 
+                  Envie a mensagem e volte para o próximo cliente.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
 
@@ -827,32 +795,18 @@ Equipe Beautycom 💄`
                 </Button>
                 
                 <Button 
-                  onClick={handleSendCampaign}
+                  onClick={handleSendToSelected}
                   disabled={
-                    sending || 
                     selectedProfessionals.size === 0 || 
-                    !message.trim() ||
-                    !automationStatus.isInitialized ||
-                    !automationStatus.isLoggedIn
+                    !message.trim()
                   }
                   className="w-full"
                 >
-                  {sending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      {!automationStatus.isInitialized
-                        ? 'Inicialize o WhatsApp'
-                        : !automationStatus.isLoggedIn
-                          ? 'Aguarde o Login'
-                          : `Enviar Campanha (${selectedProfessionals.size})`
-                      }
-                    </>
-                  )}
+                  <Send className="h-4 w-4 mr-2" />
+                  {selectedProfessionals.size === 0
+                    ? 'Selecione Clientes'
+                    : `Abrir WhatsApp (${selectedProfessionals.size} selecionados)`
+                  }
                 </Button>
               </div>
             </CardContent>
@@ -968,6 +922,20 @@ Equipe Beautycom 💄`
                       </Badge>
                       {selectedProfessionals.has(professional.id) && (
                         <CheckCircle className="h-5 w-5 text-primary" />
+                      )}
+                      {professional.phone && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openWhatsAppWithMessage(professional)
+                          }}
+                          className="ml-2"
+                        >
+                          <Send className="h-3 w-3 mr-1" />
+                          WhatsApp
+                        </Button>
                       )}
                     </div>
                   </div>
