@@ -27,6 +27,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { WhatsAppHistoryCard } from '@/components/WhatsAppHistoryCard'
+import { prepareMessageForWhatsApp, debugEmojis } from '@/utils/whatsappEncoding'
 // Removido: useWhatsAppAutomation e WhatsAppMessage (sistema Puppeteer)
 import { whatsappTemplates, getTemplatesByCategory, WhatsAppTemplate } from '@/data/whatsappTemplates'
 
@@ -325,12 +326,21 @@ Equipe Beautycom ✨`
     // Personalizar mensagem
     const personalizedMessage = personalizeMessage(message, professional)
     
+    // Preparar mensagem com encoding correto para emojis
+    const preparedMessage = prepareMessageForWhatsApp(personalizedMessage)
+    
+    // Debug emojis (apenas em desenvolvimento)
+    if (process.env.NODE_ENV === 'development') {
+      debugEmojis(preparedMessage)
+    }
+    
     // Formatar telefone (remover caracteres especiais e adicionar código do país)
     const formattedPhone = professional.phone.replace(/\D/g, '')
     const phoneWithCountryCode = formattedPhone.startsWith('55') ? formattedPhone : `55${formattedPhone}`
     
-    // Criar URL do WhatsApp
-    const whatsappUrl = `https://wa.me/${phoneWithCountryCode}?text=${encodeURIComponent(personalizedMessage)}`
+    // Criar URL do WhatsApp com encoding correto para emojis
+    const encodedMessage = encodeURIComponent(preparedMessage)
+    const whatsappUrl = `https://wa.me/${phoneWithCountryCode}?text=${encodedMessage}`
     
     // Registrar log da mensagem (simulando envio bem-sucedido)
     try {
@@ -343,7 +353,7 @@ Equipe Beautycom ✨`
           user_name: professional.name,
           user_email: professional.email,
           phone: professional.phone,
-          message_sent: personalizedMessage,
+          message_sent: preparedMessage,
           template_id: selectedTemplate || null,
           status: 'sent',
           sent_at: new Date().toISOString()
