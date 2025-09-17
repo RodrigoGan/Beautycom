@@ -27,7 +27,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import { WhatsAppHistoryCard } from '@/components/WhatsAppHistoryCard'
-import { prepareMessageForWhatsApp, debugEmojis } from '@/utils/whatsappEncoding'
+import { encodeMessageForWhatsAppUrl, testWhatsAppUrl } from '@/utils/whatsappEncoding'
 // Removido: useWhatsAppAutomation e WhatsAppMessage (sistema Puppeteer)
 import { whatsappTemplates, getTemplatesByCategory, WhatsAppTemplate } from '@/data/whatsappTemplates'
 
@@ -326,20 +326,12 @@ Equipe Beautycom ✨`
     // Personalizar mensagem
     const personalizedMessage = personalizeMessage(message, professional)
     
-    // Preparar mensagem com encoding correto para emojis
-    const preparedMessage = prepareMessageForWhatsApp(personalizedMessage)
-    
-    // Debug emojis (apenas em desenvolvimento)
-    if (process.env.NODE_ENV === 'development') {
-      debugEmojis(preparedMessage)
-    }
-    
     // Formatar telefone (remover caracteres especiais e adicionar código do país)
     const formattedPhone = professional.phone.replace(/\D/g, '')
     const phoneWithCountryCode = formattedPhone.startsWith('55') ? formattedPhone : `55${formattedPhone}`
     
-    // Criar URL do WhatsApp com encoding correto para emojis
-    const encodedMessage = encodeURIComponent(preparedMessage)
+    // Criar URL do WhatsApp com encoding simples
+    const encodedMessage = encodeMessageForWhatsAppUrl(personalizedMessage)
     const whatsappUrl = `https://wa.me/${phoneWithCountryCode}?text=${encodedMessage}`
     
     // Registrar log da mensagem (simulando envio bem-sucedido)
@@ -353,7 +345,7 @@ Equipe Beautycom ✨`
           user_name: professional.name,
           user_email: professional.email,
           phone: professional.phone,
-          message_sent: preparedMessage,
+          message_sent: personalizedMessage,
           template_id: selectedTemplate || null,
           status: 'sent',
           sent_at: new Date().toISOString()
@@ -691,6 +683,40 @@ Equipe Beautycom ✨`
                   }}
                 >
                   Template Padrão
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (message.trim()) {
+                      testWhatsAppUrl(message)
+                      toast({
+                        title: "Teste de Emojis",
+                        description: "Verifique o console para ver se os emojis estão sendo preservados",
+                        variant: "default"
+                      })
+                    }
+                  }}
+                >
+                  Testar Emojis
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (message.trim()) {
+                      const unicodeUrl = `https://wa.me/5511999999999?text=${encodeMessageForWhatsAppUrlUnicode(message)}`
+                      console.log('🧪 Teste Unicode:', unicodeUrl)
+                      window.open(unicodeUrl, '_blank')
+                      toast({
+                        title: "Teste Unicode",
+                        description: "Testando método Unicode para emojis",
+                        variant: "default"
+                      })
+                    }
+                  }}
+                >
+                  Teste Unicode
                 </Button>
               </div>
             </CardContent>
