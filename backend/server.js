@@ -2,13 +2,76 @@ const express = require('express')
 const cors = require('cors')
 const puppeteer = require('puppeteer')
 const path = require('path')
+const rateLimit = require('express-rate-limit')
+const helmet = require('helmet')
 
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Headers de segurança
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // máximo 100 requests por IP por janela
+  message: {
+    error: 'Muitas requisições deste IP, tente novamente em 15 minutos.',
+    retryAfter: '15 minutos'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10, // máximo 10 requests para endpoints críticos
+  message: {
+    error: 'Muitas tentativas de acesso, tente novamente em 15 minutos.',
+    retryAfter: '15 minutos'
+  }
+});
+
 // Middleware
-app.use(cors())
-app.use(express.json())
+const allowedOrigins = [
+  'https://beautycom.app',
+  'https://www.beautycom.app',
+  'https://beautycom.com.br',
+  'https://www.beautycom.com.br',
+  'http://localhost:5173', // Para desenvolvimento
+  'http://localhost:3000'  // Para desenvolvimento
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permitir requisições sem origin (ex: mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Não permitido pelo CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+app.use(express.json({ limit: '10mb' })); // Limitar tamanho do payload
+
+// Aplicar rate limiting
+app.use('/api/', limiter);
 
 // Variáveis globais para controle do WhatsApp
 let browser = null
@@ -19,8 +82,16 @@ let isLoggedIn = false
 /**
  * Inicializa o WhatsApp Web
  */
-app.post('/api/whatsapp/initialize', async (req, res) => {
+app.post('/api/whatsapp/initialize', strictLimiter, async (req, res) => {
   try {
+    // Validação de entrada
+    if (req.body && Object.keys(req.body).length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Este endpoint não aceita parâmetros no body'
+      });
+    }
+
     console.log('🚀 Inicializando WhatsApp...')
     
     // Fechar instância anterior se existir
@@ -29,7 +100,7 @@ app.post('/api/whatsapp/initialize', async (req, res) => {
     }
 
     browser = await puppeteer.launch({
-      headless: false, // Mostrar navegador para login
+      headless: process.env.NODE_ENV === 'production', // Headless em produção
       defaultViewport: null,
       args: [
         '--no-sandbox',
@@ -39,10 +110,19 @@ app.post('/api/whatsapp/initialize', async (req, res) => {
         '--no-first-run',
         '--no-zygote',
         '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor'
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images', // Melhor performance
+        '--disable-javascript', // Desabilitar JS desnecessário
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection'
       ],
-      userDataDir: './whatsapp-session' // Manter sessão logada
+      userDataDir: './whatsapp-session', // Manter sessão logada
+      ignoreDefaultArgs: ['--disable-extensions'],
+      timeout: 30000
     })
 
     page = await browser.newPage()
@@ -192,9 +272,53 @@ async function sendMessage(phone, message) {
 /**
  * Envia campanha em lote
  */
-app.post('/api/whatsapp/send-campaign', async (req, res) => {
+app.post('/api/whatsapp/send-campaign', strictLimiter, async (req, res) => {
   try {
     const { messages, options = {} } = req.body
+    
+    // Validação de entrada
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Campo "messages" é obrigatório e deve ser um array não vazio'
+      });
+    }
+
+    // Validar estrutura das mensagens
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (!msg.phone || !msg.message || !msg.professionalId) {
+        return res.status(400).json({
+          success: false,
+          message: `Mensagem ${i + 1} inválida: phone, message e professionalId são obrigatórios`
+        });
+      }
+
+      // Validar formato do telefone
+      const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+      if (!phoneRegex.test(msg.phone)) {
+        return res.status(400).json({
+          success: false,
+          message: `Telefone inválido na mensagem ${i + 1}`
+        });
+      }
+
+      // Limitar tamanho da mensagem
+      if (msg.message.length > 1000) {
+        return res.status(400).json({
+          success: false,
+          message: `Mensagem ${i + 1} muito longa (máximo 1000 caracteres)`
+        });
+      }
+    }
+
+    // Limitar número de mensagens
+    if (messages.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Máximo de 100 mensagens por campanha'
+      });
+    }
     
     if (!isInitialized || !isLoggedIn) {
       return res.status(400).json({

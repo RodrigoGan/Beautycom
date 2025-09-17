@@ -8,6 +8,7 @@ export const useAgendaConfigurationModal = (userId?: string) => {
   const [showModal, setShowModal] = useState(false)
   const [hasCheckedToday, setHasCheckedToday] = useState(false)
   const [isProfessional, setIsProfessional] = useState(false)
+  const [hasActiveAgenda, setHasActiveAgenda] = useState(false)
   const navigate = useNavigate()
   
   const { checkConfigurationStatus, isComplete, missingItems, loading } = useAgendaConfigurationStatus(userId)
@@ -31,17 +32,17 @@ export const useAgendaConfigurationModal = (userId?: string) => {
     // Só mostra se:
     // 1. É profissional
     // 2. Tem trial ativo
-    // 3. Agenda não está completa
+    // 3. (Agenda não está completa OU agenda está desativada)
     // 4. Não foi mostrado hoje
     return (
       userId &&
       isProfessional &&
       trialInfo?.status === 'active' &&
-      !isComplete &&
+      (!isComplete || !hasActiveAgenda) &&
       !hasShownToday() &&
       !loading
     )
-  }, [userId, isProfessional, trialInfo, isComplete, loading, hasShownToday])
+  }, [userId, isProfessional, trialInfo, isComplete, hasActiveAgenda, loading, hasShownToday])
 
   // Verificar se é profissional
   const checkIfProfessional = useCallback(async () => {
@@ -63,6 +64,50 @@ export const useAgendaConfigurationModal = (userId?: string) => {
     }
   }, [userId])
 
+  // Verificar se a agenda está ativa
+  const checkAgendaStatus = useCallback(async () => {
+    if (!userId) return
+
+    try {
+      // 1. Verificar se é dono de salão com agenda ativa
+      const { data: salonData, error: salonError } = await supabase
+        .from('salons_studios')
+        .select('id, name')
+        .eq('owner_id', userId)
+        .single()
+
+      if (!salonError && salonData) {
+        // É dono de salão, verificar agenda do salão
+        const { data: salonProfessionalData, error: salonProfessionalError } = await supabase
+          .from('salon_professionals')
+          .select('agenda_enabled')
+          .eq('professional_id', userId)
+          .eq('salon_id', salonData.id)
+          .eq('status', 'accepted')
+          .single()
+
+        if (!salonProfessionalError && salonProfessionalData?.agenda_enabled) {
+          setHasActiveAgenda(true)
+          return
+        }
+      }
+
+      // 2. Verificar agenda profissional independente
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('agenda_enabled')
+        .eq('id', userId)
+        .single()
+
+      if (!userError && userData) {
+        setHasActiveAgenda(userData.agenda_enabled || false)
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao verificar status da agenda:', error)
+      setHasActiveAgenda(false)
+    }
+  }, [userId])
+
   // Verificar status da configuração
   const checkAndShowModal = useCallback(async () => {
     if (!userId || !isProfessional || hasCheckedToday) {
@@ -71,14 +116,19 @@ export const useAgendaConfigurationModal = (userId?: string) => {
 
     try {
       setHasCheckedToday(true)
-      const configResult = await checkConfigurationStatus()
       
-      // Verificar se deve mostrar o modal usando o resultado direto
+      // Verificar configuração e status da agenda em paralelo
+      const [configResult] = await Promise.all([
+        checkConfigurationStatus(),
+        checkAgendaStatus()
+      ])
+      
+      // Verificar se deve mostrar o modal
       const shouldShow = (
         userId &&
         isProfessional &&
         trialInfo?.status === 'active' &&
-        !configResult.isComplete &&
+        (!configResult.isComplete || !hasActiveAgenda) &&
         !hasShownToday() &&
         !configResult.loading
       )
@@ -90,7 +140,7 @@ export const useAgendaConfigurationModal = (userId?: string) => {
     } catch (error) {
       console.error('Erro ao verificar configuração da agenda:', error)
     }
-  }, [userId, isProfessional, hasCheckedToday, checkConfigurationStatus, shouldShowModal, markAsShownToday])
+  }, [userId, isProfessional, hasCheckedToday, checkConfigurationStatus, checkAgendaStatus, hasActiveAgenda, trialInfo, hasShownToday, markAsShownToday])
 
   // Verificar quando o componente monta
   useEffect(() => {
@@ -148,6 +198,7 @@ export const useAgendaConfigurationModal = (userId?: string) => {
     daysRemaining: getDaysRemaining(),
     missingItems,
     loading,
+    hasActiveAgenda,
     handleConfigureNow,
     handleRemindLater,
     handleClose

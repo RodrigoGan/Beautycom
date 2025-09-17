@@ -16,6 +16,7 @@ interface AgendaConfigurationModalProps {
   onRemindLater: () => void
   daysRemaining: number
   missingItems: string[]
+  hasActiveAgenda?: boolean
 }
 
 export const AgendaConfigurationModal: React.FC<AgendaConfigurationModalProps> = ({
@@ -24,7 +25,8 @@ export const AgendaConfigurationModal: React.FC<AgendaConfigurationModalProps> =
   onConfigureNow,
   onRemindLater,
   daysRemaining,
-  missingItems
+  missingItems,
+  hasActiveAgenda = true
 }) => {
   const getItemIcon = (item: string) => {
     switch (item) {
@@ -45,20 +47,26 @@ export const AgendaConfigurationModal: React.FC<AgendaConfigurationModalProps> =
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-blue-700">
             <Gift className="h-6 w-6" />
-            Complete a configuração de sua agenda online
+            {!hasActiveAgenda ? 'Ative sua agenda profissional' : 'Complete a configuração de sua agenda online'}
           </DialogTitle>
           <DialogDescription className="text-left space-y-3">
             <p className="text-gray-700">
               Você tem <span className="font-semibold text-blue-600">{daysRemaining} dias restantes</span> no seu trial gratuito.
             </p>
             
-            <p className="text-gray-700">
-              Sua agenda ainda não está totalmente configurada.
-              Complete a configuração para aproveitar ao máximo
-              a <span className="font-semibold">BeautyTime</span> e começar a receber agendamentos.
-            </p>
+            {!hasActiveAgenda ? (
+              <p className="text-gray-700">
+                Sua agenda profissional está desativada. Ative sua agenda para começar a receber agendamentos de clientes e aproveitar ao máximo a <span className="font-semibold">BeautyTime</span>.
+              </p>
+            ) : (
+              <p className="text-gray-700">
+                Sua agenda ainda não está totalmente configurada.
+                Complete a configuração para aproveitar ao máximo
+                a <span className="font-semibold">BeautyTime</span> e começar a receber agendamentos.
+              </p>
+            )}
 
-            {missingItems.length > 0 && (
+            {hasActiveAgenda && missingItems.length > 0 && (
               <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">
                   O que está faltando:
@@ -82,7 +90,7 @@ export const AgendaConfigurationModal: React.FC<AgendaConfigurationModalProps> =
             className="w-full bg-blue-600 hover:bg-blue-700"
           >
             <Settings className="h-4 w-4 mr-2" />
-            Configurar Agora
+            {!hasActiveAgenda ? 'Ativar Agenda' : 'Configurar Agora'}
           </Button>
           
           <Button 

@@ -3,8 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-console.log('🔍 DEBUG Stripe Secret Key RAW:', stripeSecretKey);
-console.log('🔍 DEBUG Key length:', stripeSecretKey ? stripeSecretKey.length : 0);
 
 if (!stripeSecretKey) {
   throw new Error('STRIPE_SECRET_KEY não está configurada');
@@ -13,11 +11,9 @@ if (!stripeSecretKey) {
 // Verificar se a chave está corrompida (duplicada)
 let finalKey = stripeSecretKey;
 if (stripeSecretKey.includes('...sk_live_')) {
-  console.log('🚨 CHAVE CORROMPIDA DETECTADA! Extraindo chave correta...');
   // Extrair apenas a primeira parte da chave (antes da duplicação)
   const firstPart = stripeSecretKey.split('...sk_live_')[0];
   finalKey = firstPart;
-  console.log('🔧 Chave corrigida:', finalKey.substring(0, 20) + '...' + finalKey.substring(-10));
 }
 
 const stripe = new Stripe(finalKey);
@@ -47,10 +43,22 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Configurar CORS seguro
+  const allowedOrigins = [
+    'https://beautycom.app',
+    'https://www.beautycom.app',
+    'https://beautycom.com.br',
+    'https://www.beautycom.com.br'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Responder a requisições OPTIONS (preflight)
   if (req.method === 'OPTIONS') {

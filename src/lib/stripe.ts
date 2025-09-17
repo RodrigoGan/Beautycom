@@ -1,9 +1,15 @@
 import { loadStripe } from '@stripe/stripe-js';
 
 // Carrega o Stripe com a chave pública
-export const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-);
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+
+// Validar se a chave está definida
+if (!stripePublishableKey) {
+  console.warn('⚠️ VITE_STRIPE_PUBLISHABLE_KEY não está definida. Pagamentos não funcionarão.');
+}
+
+export const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 // Configurações do Stripe
 export const STRIPE_CONFIG = {

@@ -46,6 +46,7 @@ const BeautyWall = () => {
     daysRemaining,
     missingItems,
     loading: modalLoading,
+    hasActiveAgenda,
     handleConfigureNow,
     handleRemindLater,
     handleClose
@@ -1685,6 +1686,7 @@ const BeautyWall = () => {
         onRemindLater={handleRemindLater}
         daysRemaining={daysRemaining}
         missingItems={missingItems}
+        hasActiveAgenda={hasActiveAgenda}
       />
     </div>
   );

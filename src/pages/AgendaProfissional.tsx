@@ -31,6 +31,7 @@ const AgendaProfissional = () => {
     daysRemaining,
     missingItems,
     loading: modalLoading,
+    hasActiveAgenda,
     handleConfigureNow,
     handleRemindLater,
     handleClose
@@ -1125,6 +1126,7 @@ const AgendaProfissional = () => {
         onRemindLater={handleRemindLater}
         daysRemaining={daysRemaining}
         missingItems={missingItems}
+        hasActiveAgenda={hasActiveAgenda}
       />
     </div>
   );

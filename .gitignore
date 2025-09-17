@@ -18,6 +18,19 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.staging
+.env.development
+
+# Arquivos de configuração sensíveis
+config/secrets.json
+config/production.json
+secrets/
+credentials/
+
+# Logs de produção
+logs/
+*.log
 
 # Editor directories and files
 .vscode/*
