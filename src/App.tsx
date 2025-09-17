@@ -8,6 +8,7 @@ import { CommentProvider } from "./contexts/CommentContext";
 import { LoginModalProvider } from "./contexts/LoginModalContext";
 import { LoginModal } from "./components/LoginModal";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 
 
 import Index from "./pages/Index";
@@ -44,6 +45,7 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <LoginModal />
+                <PWAInstallPrompt />
                 {/* <SalonDebug /> */}
             <Routes>
             <Route path="/" element={<Index />} />
