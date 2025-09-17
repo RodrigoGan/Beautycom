@@ -20,11 +20,13 @@ import {
   Eye,
   Play,
   RotateCcw,
-  Square
+  Square,
+  Calendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
+import { WhatsAppHistoryCard } from '@/components/WhatsAppHistoryCard'
 // Removido: useWhatsAppAutomation e WhatsAppMessage (sistema Puppeteer)
 import { whatsappTemplates, getTemplatesByCategory, WhatsAppTemplate } from '@/data/whatsappTemplates'
 
@@ -44,6 +46,7 @@ const AdminWhatsApp: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [templateCategory, setTemplateCategory] = useState<'profissional' | 'usuario' | 'geral' | 'all'>('all')
   const [nameFilter, setNameFilter] = useState('')
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'history'>('campaigns')
   
   // Sistema simplificado - sem Puppeteer
   const [selectedClient, setSelectedClient] = useState<any>(null)
@@ -300,7 +303,7 @@ Equipe Beautycom ✨`
   }
 
   // Função para abrir WhatsApp com mensagem personalizada
-  const openWhatsAppWithMessage = (professional: any) => {
+  const openWhatsAppWithMessage = async (professional: any) => {
     if (!professional.phone) {
       toast({
         title: "Erro",
@@ -329,14 +332,67 @@ Equipe Beautycom ✨`
     // Criar URL do WhatsApp
     const whatsappUrl = `https://wa.me/${phoneWithCountryCode}?text=${encodeURIComponent(personalizedMessage)}`
     
-    // Abrir WhatsApp em nova aba
-    window.open(whatsappUrl, '_blank')
+    // Registrar log da mensagem (simulando envio bem-sucedido)
+    try {
+      const { error: logError } = await supabase
+        .from('whatsapp_message_logs')
+        .insert([{
+          campaign_id: null, // Campanha individual
+          user_id: professional.id,
+          user_type: 'profissional',
+          user_name: professional.name,
+          user_email: professional.email,
+          phone: professional.phone,
+          message_sent: personalizedMessage,
+          template_id: selectedTemplate || null,
+          status: 'sent',
+          sent_at: new Date().toISOString()
+        }])
+
+      if (logError) {
+        console.error('Erro ao registrar log:', logError)
+      }
+    } catch (error) {
+      console.error('Erro ao registrar log da mensagem:', error)
+    }
     
-    toast({
-      title: "WhatsApp Aberto",
-      description: `Mensagem preparada para ${professional.name}`,
-      variant: "default"
-    })
+    // Sistema inteligente de abertura de aba
+    const whatsappWindowName = 'beautycom-whatsapp'
+    
+    try {
+      // Tentar reutilizar aba existente
+      const existingWindow = window.open('', whatsappWindowName)
+      
+      if (existingWindow && !existingWindow.closed) {
+        // Reutilizar aba existente
+        existingWindow.location.href = whatsappUrl
+        existingWindow.focus()
+        
+        toast({
+          title: "WhatsApp Atualizado",
+          description: `Mensagem preparada para ${professional.name} (aba reutilizada)`,
+          variant: "default"
+        })
+      } else {
+        // Abrir nova aba
+        window.open(whatsappUrl, whatsappWindowName)
+        
+        toast({
+          title: "WhatsApp Aberto",
+          description: `Mensagem preparada para ${professional.name}`,
+          variant: "default"
+        })
+      }
+    } catch (error) {
+      // Fallback: abrir em nova aba se houver erro
+      window.open(whatsappUrl, '_blank')
+      
+      toast({
+        title: "WhatsApp Aberto",
+        description: `Mensagem preparada para ${professional.name}`,
+        variant: "default"
+      })
+    }
   }
 
   // Função para enviar para múltiplos clientes (abre um por vez)
@@ -404,6 +460,42 @@ Equipe Beautycom ✨`
             Gerencie e envie mensagens em massa para profissionais
           </p>
         </div>
+
+        {/* Tabs de Navegação */}
+        <Card className="mb-6">
+          <CardContent className="p-0">
+            <div className="flex border-b">
+              <button
+                onClick={() => setActiveTab('campaigns')}
+                className={`flex-1 px-6 py-4 text-left font-medium transition-colors ${
+                  activeTab === 'campaigns'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4 inline mr-2" />
+                Campanhas
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`flex-1 px-6 py-4 text-left font-medium transition-colors ${
+                  activeTab === 'history'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Calendar className="h-4 w-4 inline mr-2" />
+                Histórico
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Conteúdo das Tabs */}
+        {activeTab === 'history' ? (
+          <WhatsAppHistoryCard />
+        ) : (
+          <div className="space-y-6">
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Estatísticas */}
@@ -636,8 +728,8 @@ Equipe Beautycom ✨`
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Dica:</strong> Para múltiplos clientes, o sistema abrirá um por vez. 
-                  Envie a mensagem e volte para o próximo cliente.
+                  <strong>Dica:</strong> O sistema reutiliza a mesma aba do WhatsApp Web. 
+                  Para múltiplos clientes, envie a mensagem e volte para o próximo cliente.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -944,6 +1036,8 @@ Equipe Beautycom ✨`
             </CardContent>
           </Card>
         </div>
+          </div>
+        )}
       </div>
     </div>
   )
