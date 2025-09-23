@@ -17,6 +17,8 @@ import { useAuthContext } from "@/contexts/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "@/hooks/use-toast"
 import { useProfessionalSalon } from "@/hooks/useProfessionalSalon"
+import { useSubscriptionInfo } from "@/hooks/useSubscriptionInfo"
+import { useSalonProfessionals } from "@/hooks/useSalonProfessionals"
 import { TimeSlotSelector } from "@/components/TimeSlotSelector"
 import { translateError } from "@/utils/errorTranslations"
 import {
@@ -52,6 +54,10 @@ const NovoAgendamento = () => {
   const { getProfessionalSalonId } = useProfessionalSalon()
   const { toast } = useToast()
   const navigate = useNavigate()
+  
+  // Hooks para verificação inteligente de agenda
+  const { subscriptionSummary } = useSubscriptionInfo(user?.id)
+  const { professionals } = useSalonProfessionals(userSalon?.id || null)
   const location = useLocation()
   
   // Detectar se veio da Área Administrativa
@@ -634,16 +640,76 @@ const confirmAppointment = async () => {
   
   // Verificar se o usuário pode criar agendamentos
   const canCreateAppointments = () => {
-    // Se é proprietário de salão, pode criar agendamentos
+    if (!user?.id) return false
+    
+    // Se ainda está carregando dados, aguardar
+    // Mas só aguardar se for dono de salão (que precisa do userSalon)
+    if (!userSalon && user?.user_type === 'profissional' && userSalon?.owner_id === user?.id) {
+      console.log('⏳ Aguardando carregamento do userSalon...')
+      return false
+    }
+
+    // CENÁRIO 1: Profissional independente (não dono de salão)
+    if (user?.user_type === 'profissional' && userSalon?.owner_id !== user?.id) {
+      // Profissional independente pode criar se:
+      // 1. Tem agenda própria ativa OU
+      // 2. Tem trial ativo
+      const hasOwnAgenda = user?.agenda_enabled === true
+      const hasActiveTrial = subscriptionSummary?.type === 'trial' && subscriptionSummary?.isActive
+      
+      console.log('🔍 Profissional independente check:', {
+        hasOwnAgenda,
+        hasActiveTrial,
+        subscriptionSummary: subscriptionSummary
+      })
+      
+      return hasOwnAgenda || hasActiveTrial
+    }
+
+    // CENÁRIO 2: Dono de salão
     if (userSalon?.owner_id === user?.id) {
-      return true
+      // Verificar se tem assinatura ativa
+      const hasActiveSubscription = subscriptionSummary?.isActive === true
+      
+      if (!hasActiveSubscription) {
+        // Cenário 1: Dono sem assinatura - NÃO pode criar agendamentos
+        console.log('❌ Dono de salão sem assinatura ativa')
+        return false
+      }
+
+      // Verificar se tem agenda própria ativa
+      const hasOwnAgenda = user?.agenda_enabled === true
+      
+      // Verificar se tem profissionais com agenda ativa
+      // Usar dados do subscriptionSummary que já tem a verificação correta
+      const hasProfessionalsWithActiveAgenda = (subscriptionSummary?.currentProfessionals || 0) > 0
+      
+      console.log('🔍 Debug agenda check:', {
+        hasActiveSubscription,
+        hasOwnAgenda,
+        hasProfessionalsWithActiveAgenda,
+        currentProfessionals: subscriptionSummary?.currentProfessionals,
+        subscriptionSummary: subscriptionSummary
+      })
+
+      if (hasOwnAgenda) {
+        // Cenário 3: Dono com assinatura e agenda própria - PODE criar agendamentos
+        console.log('✅ Dono de salão com assinatura e agenda própria')
+        return true
+      }
+
+      if (hasProfessionalsWithActiveAgenda) {
+        // Cenário 2: Dono com assinatura, agenda apenas para profissionais - PODE criar agendamentos
+        console.log('✅ Dono de salão com assinatura e profissionais com agenda ativa')
+        return true
+      }
+
+      // Dono com assinatura mas sem agendas ativas
+      console.log('❌ Dono de salão com assinatura mas sem agendas ativas')
+      return false
     }
-    
-    // Se é profissional com agenda ativa, pode criar agendamentos
-    if (user?.user_type === 'profissional' && user?.agenda_enabled) {
-      return true
-    }
-    
+
+    // CENÁRIO 3: Usuário comum (não profissional)
     return false
   }
 
@@ -955,7 +1021,7 @@ const confirmAppointment = async () => {
               {formData.data && formData.servico && formData.profissional ? (
                 <TimeSlotSelector
                   professionalId={formData.profissional}
-                  salonId={null} // Profissionais independentes não têm salon_id
+                  salonId={userSalon?.id || null} // Passar o salon_id se for dono de salão
                   selectedDate={formData.data}
                   serviceDuration={servicos.find(s => s.name === formData.servico)?.duration_minutes || 60}
                   onTimeSlotSelect={setSelectedTimeSlot}

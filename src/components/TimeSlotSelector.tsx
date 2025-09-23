@@ -87,24 +87,41 @@ export const TimeSlotSelector = ({
     try {
       console.log('🔍 TimeSlotSelector - Verificando se profissional tem agenda ativa:', professionalId)
       
-      // ✅ SIMPLIFICADO: Verificar apenas se o profissional tem agenda habilitada
+      // ✅ VERIFICAÇÃO INTELIGENTE: Verificar agenda própria OU agenda do salão
+      let hasActiveAgenda = false
+      
+      // 1. Verificar agenda própria (users.agenda_enabled)
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('agenda_enabled')
         .eq('id', professionalId)
         .single()
       
-      if (userError) {
-        console.error('❌ Erro ao verificar agenda_enabled:', userError)
-        return null
+      if (!userError && userData?.agenda_enabled) {
+        hasActiveAgenda = true
+        console.log('✅ Profissional com agenda própria ativa:', professionalId)
       }
       
-      if (!userData?.agenda_enabled) {
-        console.log('❌ Profissional sem agenda habilitada:', professionalId)
-        return null
+      // 2. Se não tem agenda própria, verificar agenda do salão (salon_professionals.agenda_enabled)
+      if (!hasActiveAgenda && salonId) {
+        const { data: salonProfessionalData, error: salonProfessionalError } = await supabase
+          .from('salon_professionals')
+          .select('agenda_enabled')
+          .eq('professional_id', professionalId)
+          .eq('salon_id', salonId)
+          .eq('status', 'accepted')
+          .single()
+        
+        if (!salonProfessionalError && salonProfessionalData?.agenda_enabled) {
+          hasActiveAgenda = true
+          console.log('✅ Profissional com agenda do salão ativa:', professionalId)
+        }
       }
       
-      console.log('✅ Profissional com agenda ativa:', professionalId)
+      if (!hasActiveAgenda) {
+        console.log('❌ Profissional sem agenda habilitada (própria ou do salão):', professionalId)
+        return null
+      }
       
       // Buscar configuração de agenda baseada APENAS no professional_id
       // Não importa se é agenda própria ou habilitada por salão
