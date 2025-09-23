@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Calendar, Clock, User, X, Loader2 } from 'lucide-react'
 import { TimeSlotSelector } from './TimeSlotSelector'
 import { ProfessionalSearchInput } from './ProfessionalSearchInput'
+import { AppointmentSuccessModal } from './AppointmentSuccessModal'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 import { useAuthContext } from '@/contexts/AuthContext'
@@ -24,6 +25,7 @@ import {
 interface PersonalScheduleModalProps {
   isOpen: boolean
   onClose: () => void
+  onAppointmentCreated?: (appointment: any) => void
 }
 
 interface Professional {
@@ -44,7 +46,8 @@ interface ProfessionalService {
 
 export const PersonalScheduleModal: React.FC<PersonalScheduleModalProps> = ({ 
   isOpen, 
-  onClose 
+  onClose,
+  onAppointmentCreated
 }) => {
   const { user } = useAuthContext()
   const { toast } = useToast()
@@ -58,6 +61,8 @@ export const PersonalScheduleModal: React.FC<PersonalScheduleModalProps> = ({
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
   const [notes, setNotes] = useState('')
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [createdAppointment, setCreatedAppointment] = useState<any>(null)
 
   // Buscar serviços quando um profissional é selecionado
   useEffect(() => {
@@ -161,15 +166,18 @@ export const PersonalScheduleModal: React.FC<PersonalScheduleModalProps> = ({
 
       if (result.error) throw new Error(result.error)
 
-      toast({
-        title: 'Agendamento criado!',
-        description: 'Seu horário foi agendado com sucesso.',
-        variant: 'default'
-      })
-
-      // Fechar modal e limpar dados
-      onClose()
-      resetForm()
+      // Se há callback do componente pai, usar ele
+      if (onAppointmentCreated) {
+        onAppointmentCreated(result.data)
+        onClose()
+        resetForm()
+      } else {
+        // Senão, mostrar modal de sucesso interno
+        setCreatedAppointment(result.data)
+        setShowSuccessModal(true)
+        onClose()
+        resetForm()
+      }
       
     } catch (error) {
       console.error('Erro ao criar agendamento:', error)
@@ -189,6 +197,8 @@ export const PersonalScheduleModal: React.FC<PersonalScheduleModalProps> = ({
     setSelectedDate('')
     setSelectedTime('')
     setNotes('')
+    setCreatedAppointment(null)
+    setShowSuccessModal(false)
   }
 
   const handleClose = () => {
@@ -376,6 +386,16 @@ export const PersonalScheduleModal: React.FC<PersonalScheduleModalProps> = ({
           </div>
         )}
       </DialogContent>
+      
+      {/* Modal de Sucesso */}
+      <AppointmentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        appointment={createdAppointment}
+        onSend={() => {
+          console.log('Mensagem enviada com sucesso!')
+        }}
+      />
     </Dialog>
   )
 }

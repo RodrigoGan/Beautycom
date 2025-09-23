@@ -14,6 +14,7 @@ import { Appointment } from '@/hooks/useAppointments'
 import { format, isToday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { PersonalScheduleModal } from '@/components/PersonalScheduleModal'
+import { AppointmentSuccessModal } from '@/components/AppointmentSuccessModal'
 import { useToast } from '@/hooks/use-toast'
 
 const AgendaPessoal = () => {
@@ -36,6 +37,8 @@ const AgendaPessoal = () => {
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
   const [cancellationReason, setCancellationReason] = useState('')
   const [expandedAppointments, setExpandedAppointments] = useState<Set<string>>(new Set())
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [createdAppointment, setCreatedAppointment] = useState<any>(null)
   
   // Scroll para o topo quando a página carregar
   useEffect(() => {
@@ -389,6 +392,10 @@ const AgendaPessoal = () => {
       <PersonalScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
+        onAppointmentCreated={(appointment) => {
+          setCreatedAppointment(appointment)
+          setShowSuccessModal(true)
+        }}
       />
 
       {/* Modal de Confirmação de Exclusão */}
@@ -463,6 +470,16 @@ const AgendaPessoal = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Sucesso do Agendamento */}
+      <AppointmentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        appointment={createdAppointment}
+        onSend={() => {
+          console.log('Mensagem enviada com sucesso!')
+        }}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Calendar, Clock, User, X, Loader2 } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { TimeSlotSelector } from './TimeSlotSelector'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
@@ -218,9 +219,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           <div className="space-y-4">
             {/* Informações do Profissional */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-white font-semibold">
-                {professional.name.charAt(0).toUpperCase()}
-              </div>
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={professional.profile_photo} alt={professional.name} />
+                <AvatarFallback className="bg-gradient-primary text-white font-semibold">
+                  {professional.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <div>
                 <p className="font-medium">{professional.name}</p>
                 <p className="text-sm text-muted-foreground">Profissional</p>

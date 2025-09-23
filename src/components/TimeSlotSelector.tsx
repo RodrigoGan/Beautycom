@@ -170,7 +170,28 @@ export const TimeSlotSelector = ({
       return data
     } catch (error) {
       console.error('❌ Erro ao buscar configuração de agenda:', error)
-      return null
+      // Em caso de erro, retornar configuração padrão
+      console.log('⚠️ Erro na busca, usando configuração padrão')
+      const defaultConfig: AgendaConfig = {
+        id: 'default',
+        professional_id: professionalId,
+        salon_id: null,
+        opening_time: '08:00',
+        closing_time: '18:00',
+        lunch_break_enabled: true,
+        lunch_start_time: '12:00',
+        lunch_end_time: '13:00',
+        working_days: {
+          monday: true,
+          tuesday: true,
+          wednesday: true,
+          thursday: true,
+          friday: true,
+          saturday: true,
+          sunday: false
+        }
+      }
+      return defaultConfig
     }
   }, [professionalId])
 
@@ -485,9 +506,9 @@ export const TimeSlotSelector = ({
         
         {/* Informações adicionais */}
         <div className="mt-3 p-2 bg-muted/30 rounded text-xs text-muted-foreground">
-          <p><strong>Funcionamento:</strong> {agendaConfig.opening_time.slice(0, 5)} - {agendaConfig.closing_time.slice(0, 5)}</p>
-          {agendaConfig.lunch_break_enabled && (
-            <p><strong>Almoço:</strong> {agendaConfig.lunch_start_time.slice(0, 5)} - {agendaConfig.lunch_end_time.slice(0, 5)}</p>
+          <p><strong>Funcionamento:</strong> {agendaConfig?.opening_time?.slice(0, 5) || '08:00'} - {agendaConfig?.closing_time?.slice(0, 5) || '18:00'}</p>
+          {agendaConfig?.lunch_break_enabled && (
+            <p><strong>Almoço:</strong> {agendaConfig?.lunch_start_time?.slice(0, 5) || '12:00'} - {agendaConfig?.lunch_end_time?.slice(0, 5) || '13:00'}</p>
           )}
           <p><strong>Duração:</strong> {serviceDuration} min</p>
         </div>
