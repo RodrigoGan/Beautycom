@@ -22,6 +22,7 @@ import {
 interface ScheduleModalProps {
   isOpen: boolean
   onClose: () => void
+  onAppointmentCreated?: (appointment: any) => void
   professional: {
     id: string
     name: string
@@ -41,6 +42,7 @@ interface ProfessionalService {
 export const ScheduleModal: React.FC<ScheduleModalProps> = ({ 
   isOpen, 
   onClose, 
+  onAppointmentCreated,
   professional 
 }) => {
   const { user } = useAuthContext()
@@ -158,13 +160,10 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
       if (result.error) throw new Error(result.error)
 
-      toast({
-        title: 'Agendamento criado!',
-        description: 'Seu horário foi agendado com sucesso.',
-        variant: 'default'
-      })
-
-      // Fechar modal e limpar dados
+      // Chamar callback do componente pai com os dados do agendamento
+      onAppointmentCreated?.(result.data)
+      
+      // Fechar modal de agendamento
       onClose()
       resetForm()
       
@@ -332,6 +331,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </div>
         )}
       </DialogContent>
+      
     </Dialog>
   )
 }

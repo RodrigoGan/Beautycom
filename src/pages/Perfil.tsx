@@ -27,6 +27,7 @@ import { ProfessionalInvites } from "@/components/ProfessionalInvites"
 import { WorkplaceCard } from "@/components/WorkplaceCard"
 import { ScheduleModal } from "@/components/ScheduleModal"
 import { AgendaUnavailableModal } from "@/components/AgendaUnavailableModal"
+import { AppointmentSuccessModal } from "@/components/AppointmentSuccessModal"
 import { useProfessionalAgendaStatus } from "@/hooks/useProfessionalAgendaStatus"
 
 import { MainPostButton } from "@/components/MainPostButton"
@@ -58,6 +59,8 @@ const Perfil = () => {
   const [selectedPost, setSelectedPost] = useState<any>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showAgendaUnavailableModal, setShowAgendaUnavailableModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [createdAppointment, setCreatedAppointment] = useState<any>(null)
   const [isModalTransitioning, setIsModalTransitioning] = useState(false)
   const [followModalType, setFollowModalType] = useState<'following' | 'followers'>('following')
   const [activityModalType, setActivityModalType] = useState<'favorites' | 'likes'>('favorites')
@@ -1811,6 +1814,10 @@ const Perfil = () => {
                 setShowScheduleModal(false)
                 setIsModalTransitioning(false)
               }}
+              onAppointmentCreated={(appointment) => {
+                setCreatedAppointment(appointment)
+                setShowSuccessModal(true)
+              }}
               professional={{
                 id: displayUser?.id || '',
                 name: displayUser?.name || 'Profissional',
@@ -1842,6 +1849,16 @@ const Perfil = () => {
               }
             />
           )}
+
+          {/* Modal de Sucesso do Agendamento */}
+          <AppointmentSuccessModal
+            isOpen={showSuccessModal}
+            onClose={() => setShowSuccessModal(false)}
+            appointment={createdAppointment}
+            onSend={() => {
+              console.log('Mensagem enviada com sucesso!')
+            }}
+          />
 
         </div>
       </div>
