@@ -142,28 +142,17 @@ export const TimeSlotSelector = ({
         console.error('❌ Detalhes:', error.details)
         console.error('❌ Hint:', error.hint)
         
-        // Se não encontrou configuração, retornar configuração padrão
+        // Se não encontrou configuração, retornar configuração padrão no formato correto
         console.log('⚠️ Configuração não encontrada, usando configuração padrão')
-        return {
+        const defaultConfig: AgendaConfig = {
           id: 'default',
           professional_id: professionalId,
-          monday_start: '08:00',
-          monday_end: '18:00',
-          tuesday_start: '08:00',
-          tuesday_end: '18:00',
-          wednesday_start: '08:00',
-          wednesday_end: '18:00',
-          thursday_start: '08:00',
-          thursday_end: '18:00',
-          friday_start: '08:00',
-          friday_end: '18:00',
-          saturday_start: '08:00',
-          saturday_end: '18:00',
-          sunday_start: '08:00',
-          sunday_end: '18:00',
-          break_start: '12:00',
-          break_end: '13:00',
-          slot_duration: 30,
+          salon_id: null,
+          opening_time: '08:00',
+          closing_time: '18:00',
+          lunch_break_enabled: true,
+          lunch_start_time: '12:00',
+          lunch_end_time: '13:00',
           working_days: {
             monday: true,
             tuesday: true,
@@ -172,9 +161,9 @@ export const TimeSlotSelector = ({
             friday: true,
             saturday: true,
             sunday: false
-          },
-          is_default: true
+          }
         }
+        return defaultConfig
       }
 
       console.log('✅ Configuração de agenda encontrada:', data)

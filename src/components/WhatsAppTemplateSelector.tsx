@@ -27,6 +27,7 @@ import {
   generateWhatsAppUrl
 } from '@/utils/whatsappEncoding'
 import { getTemplateById } from '@/data/whatsappTemplates'
+import { getTemplateByIdPreferDb } from '@/utils/whatsappTemplatesDb'
 import { useToast } from '@/hooks/use-toast'
 
 interface WhatsAppTemplateSelectorProps {
@@ -91,7 +92,7 @@ export const WhatsAppTemplateSelector: React.FC<WhatsAppTemplateSelectorProps> =
   }, [selectedTemplate])
 
   // Carregar template quando selecionado
-  const handleTemplateSelect = (templateId: string, e?: React.MouseEvent) => {
+  const handleTemplateSelect = async (templateId: string, e?: React.MouseEvent) => {
     // Evita que o clique atual borbulhe e acione elementos renderizados após o setState
     e?.preventDefault()
     e?.stopPropagation()
@@ -103,7 +104,8 @@ export const WhatsAppTemplateSelector: React.FC<WhatsAppTemplateSelectorProps> =
     console.log('🔍 Selecionando template:', templateId)
     console.log('📋 Appointment:', appointment)
 
-    const template = getTemplateById(templateId)
+    // Buscar template no banco com fallback local
+    const template = await getTemplateByIdPreferDb(templateId)
     if (!template) {
       console.error('❌ Template não encontrado!')
       setMessage('Erro: Template não encontrado.')

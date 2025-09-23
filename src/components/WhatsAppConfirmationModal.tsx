@@ -24,6 +24,7 @@ import {
   Copy
 } from 'lucide-react'
 import { Appointment } from '@/hooks/useAppointments'
+import { getTemplateByIdPreferDb } from '@/utils/whatsappTemplatesDb'
 import { 
   formatAppointmentData, 
   replaceTemplatePlaceholders, 
@@ -57,11 +58,11 @@ export const WhatsAppConfirmationModal: React.FC<WhatsAppConfirmationModalProps>
     }
   }, [isOpen, appointment])
 
-  const loadTemplateAndData = () => {
+  const loadTemplateAndData = async () => {
     if (!appointment) return
 
-    // Buscar template de agendamento
-    const template = getTemplateById('agendamento_confirmacao')
+    // Buscar template de agendamento (DB primeiro)
+    const template = await getTemplateByIdPreferDb('agendamento_confirmacao')
     if (!template) {
       console.error('Template de agendamento não encontrado')
       return
