@@ -231,6 +231,72 @@ Agende com segurança e comodidade!
 
 Equipe Beautycom`,
     useCase: 'Enviar para usuários que não agendaram recentemente'
+  },
+
+  {
+    id: 'agendamento_confirmacao',
+    name: 'Agendamento - Confirmação',
+    description: 'Confirmar agendamento com cliente',
+    category: 'geral',
+      variables: ['CLIENTE', 'PROFISSIONAL', 'SERVICO', 'SERVICO_ICONE', 'DATA', 'HORA', 'DURACAO', 'VALOR', 'ENDERECO'],
+      content: `Olá [CLIENTE]! Seu agendamento foi confirmado:
+
+📅 Data: [DATA]
+⏰ Horário: [HORA]
+👨‍⚕️ Profissional: [PROFISSIONAL]
+[SERVICO_ICONE] Serviço: [SERVICO]
+⏱️ Duração: [DURACAO]min
+💰 Valor: R$ [VALOR]
+📍 Local: [ENDERECO]
+
+Qualquer dúvida, entre em contato!
+
+Equipe Beautycom`,
+    useCase: 'Enviar após criação de agendamento'
+  },
+  {
+    id: 'agendamento_lembrete',
+    name: 'Agendamento - Lembrete',
+    description: 'Lembrar cliente do agendamento próximo',
+    category: 'geral',
+      variables: ['CLIENTE', 'PROFISSIONAL', 'SERVICO', 'SERVICO_ICONE', 'DATA', 'HORA', 'ENDERECO'],
+      content: `Olá [CLIENTE]! 
+
+Este é um lembrete do seu agendamento:
+
+📅 Data: [DATA]
+⏰ Horário: [HORA]
+👨‍⚕️ Profissional: [PROFISSIONAL]
+[SERVICO_ICONE] Serviço: [SERVICO]
+📍 Local: [ENDERECO]
+
+O profissional está aguardando você! Caso precise reagendar ou cancelar, entre em contato conosco.
+
+Equipe Beautycom`,
+    useCase: 'Enviar como lembrete antes do agendamento'
+  },
+  {
+    id: 'agendamento_pontualidade',
+    name: 'Agendamento - Pontualidade',
+    description: 'Solicitar que cliente chegue 10 minutos antes',
+    category: 'geral',
+      variables: ['CLIENTE', 'PROFISSIONAL', 'SERVICO', 'SERVICO_ICONE', 'DATA', 'HORA', 'ENDERECO'],
+      content: `Olá [CLIENTE]!
+
+Lembramos que seu agendamento é:
+
+📅 Data: [DATA]
+⏰ Horário: [HORA]
+👨‍⚕️ Profissional: [PROFISSIONAL]
+[SERVICO_ICONE] Serviço: [SERVICO]
+📍 Local: [ENDERECO]
+
+Para garantir que tudo corra perfeitamente, pedimos que chegue 10 minutos antes do horário marcado.
+
+Obrigado pela compreensão!
+
+Equipe Beautycom`,
+    useCase: 'Enviar para solicitar pontualidade'
   }
 ]
 
@@ -240,5 +306,9 @@ export const getTemplatesByCategory = (category: 'profissional' | 'usuario' | 'g
 }
 
 export const getTemplateById = (id: string) => {
-  return whatsappTemplates.find(template => template.id === id)
+  console.log('🔍 Buscando template com ID:', id)
+  console.log('📋 Templates disponíveis:', whatsappTemplates.map(t => t.id))
+  const template = whatsappTemplates.find(template => template.id === id)
+  console.log('✅ Template encontrado:', template)
+  return template
 }

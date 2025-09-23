@@ -41,6 +41,12 @@ export interface Appointment {
     name: string
     email: string
     profile_photo?: string
+    logradouro?: string
+    numero?: string
+    complemento?: string
+    bairro?: string
+    cidade?: string
+    uf?: string
   }
   service?: {
     id: string
@@ -48,6 +54,7 @@ export interface Appointment {
     description?: string
     duration: number
     price: number
+    category: string
   }
 }
 
@@ -108,8 +115,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
 
       // Se asClientOnly=true, buscar apenas agendamentos como cliente
@@ -222,8 +229,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
         .or(`salon_id.eq.${salonId},and(salon_id.is.null,professional_id.eq.${user?.id})`) // ✅ Incluir apenas agendamentos como profissional independente do usuário atual
 
@@ -371,8 +378,8 @@ export const useAppointments = () => {
             *,
             salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
             client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-            professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-            service:professional_services(id, name, description, duration_minutes, price)
+            professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+            service:professional_services(id, name, description, duration_minutes, price, category)
           `)
           .single()
 
@@ -506,8 +513,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
         .single()
 
@@ -578,8 +585,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
         .eq('id', appointmentId)
         .single()
@@ -666,8 +673,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone, profile_photo),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
         .eq('confirmation_code', confirmationCode.toUpperCase())
         .single()
@@ -691,8 +698,8 @@ export const useAppointments = () => {
           *,
           salon:salons_studios(id, name, logradouro, numero, bairro, cidade, uf),
           client:users!appointments_client_id_fkey(id, name, email, phone),
-          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo),
-          service:professional_services(id, name, description, duration_minutes, price)
+          professional:users!appointments_professional_id_fkey(id, name, email, phone, profile_photo, logradouro, numero, complemento, bairro, cidade, uf),
+          service:professional_services(id, name, description, duration_minutes, price, category)
         `)
         .eq('date', date)
 

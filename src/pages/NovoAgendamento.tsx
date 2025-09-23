@@ -21,6 +21,7 @@ import { useSubscriptionInfo } from "@/hooks/useSubscriptionInfo"
 import { useSalonProfessionals } from "@/hooks/useSalonProfessionals"
 import { TimeSlotSelector } from "@/components/TimeSlotSelector"
 import { translateError } from "@/utils/errorTranslations"
+import { WhatsAppConfirmationModal } from "@/components/WhatsAppConfirmationModal"
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,11 @@ const NovoAgendamento = () => {
     horario: '',
     observacoes: ''
   })
+
+  // Estados para modal WhatsApp
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
+  const [createdAppointment, setCreatedAppointment] = useState(null)
+  const [autoOpenWhatsApp, setAutoOpenWhatsApp] = useState(false)
 
   // Hooks
   const { user } = useAuthContext()
@@ -588,6 +594,9 @@ const confirmAppointment = async () => {
 
     console.log('✅ NovoAgendamento - Agendamento criado com sucesso:', result.data)
 
+    // Salvar dados do agendamento criado
+    setCreatedAppointment(result.data)
+
     // Toast de sucesso com informação do status
     const statusMessage = initialStatus === 'confirmed' 
       ? 'O agendamento foi criado e confirmado automaticamente.'
@@ -599,9 +608,14 @@ const confirmAppointment = async () => {
       variant: 'default'
     })
 
-    // Sucesso - redirecionar para agenda profissional
-    console.log('✅ NovoAgendamento - Redirecionando para agenda profissional')
-    navigate('/agenda-completa?refresh=true', { replace: true })
+    // Verificar se deve abrir modal WhatsApp automaticamente
+    if (autoOpenWhatsApp) {
+      setShowWhatsAppModal(true)
+    } else {
+      // Sucesso - redirecionar para agenda profissional
+      console.log('✅ NovoAgendamento - Redirecionando para agenda profissional')
+      navigate('/agenda-completa?refresh=true', { replace: true })
+    }
 
   } catch (error) {
     console.error('❌ NovoAgendamento - Erro detalhado:', error)
@@ -1068,6 +1082,20 @@ const confirmAppointment = async () => {
               )}
 
 
+              {/* Opção WhatsApp */}
+              <div className="flex items-center space-x-2 pt-4">
+                <input
+                  type="checkbox"
+                  id="autoOpenWhatsApp"
+                  checked={autoOpenWhatsApp}
+                  onChange={(e) => setAutoOpenWhatsApp(e.target.checked)}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="autoOpenWhatsApp" className="text-sm text-gray-700">
+                  Abrir WhatsApp após salvar o agendamento
+                </label>
+              </div>
+
               {/* Botões */}
               <div className="flex gap-4 pt-4">
                 <Button 
@@ -1197,6 +1225,21 @@ const confirmAppointment = async () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Modal WhatsApp */}
+        <WhatsAppConfirmationModal
+          isOpen={showWhatsAppModal}
+          onClose={() => {
+            setShowWhatsAppModal(false)
+            // Redirecionar para agenda após fechar modal
+            navigate('/agenda-completa?refresh=true', { replace: true })
+          }}
+          appointment={createdAppointment}
+          onSend={() => {
+            console.log('✅ WhatsApp enviado com sucesso')
+            // Log para métricas
+          }}
+        />
       </div>
     </div>
   )

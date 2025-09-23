@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Calendar, Clock, User, Search, Filter, ArrowLeft, Plus, Edit, Trash2, AlertCircle, ChevronDown, ChevronUp, X, List, Grid3X3, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar, Clock, User, Search, Filter, ArrowLeft, Plus, Edit, Trash2, AlertCircle, ChevronDown, ChevronUp, X, List, Grid3X3, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
 import { Link, useSearchParams } from "react-router-dom"
 import { Header } from "@/components/Header"
 import { useAuthContext } from "@/contexts/AuthContext"
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { WhatsAppTemplateSelector } from "@/components/WhatsAppTemplateSelector"
 
 const AgendaCompleta = () => {
   const { user } = useAuthContext()
@@ -120,6 +121,10 @@ const AgendaCompleta = () => {
   // Estados para modal de confirmação de exclusão
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [appointmentToDelete, setAppointmentToDelete] = useState<string | null>(null)
+  
+  // Estados para modal WhatsApp
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
+  const [selectedAppointmentForWhatsApp, setSelectedAppointmentForWhatsApp] = useState<any>(null)
 
   // Função para buscar salão onde trabalha - REMOVIDO TEMPORARIAMENTE
   // const fetchWorkplaceSalon = useCallback(async () => {
@@ -1546,6 +1551,19 @@ const AgendaCompleta = () => {
                               
                               {/* Ações */}
                               <div className="flex gap-2 pt-2 border-t">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="flex-1"
+                                  onClick={() => {
+                                    setSelectedAppointmentForWhatsApp(appointment)
+                                    setShowWhatsAppModal(true)
+                                  }}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-2" />
+                                  WhatsApp
+                                </Button>
+                                
                                 {appointment.status === 'pending' && hasPermission('appointments.edit') && (
                                   <Button 
                                     variant="outline" 
@@ -2144,6 +2162,17 @@ const AgendaCompleta = () => {
                 {/* Ações */}
                 <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
                   <Button
+                    onClick={() => {
+                      setSelectedAppointmentForWhatsApp(selectedAppointmentDetails)
+                      setShowWhatsAppModal(true)
+                    }}
+                    className="flex-1"
+                    variant="outline"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    WhatsApp
+                  </Button>
+                  <Button
                     onClick={() => handleSendReminder(selectedAppointmentDetails.id)}
                     className="flex-1"
                     variant="outline"
@@ -2318,6 +2347,19 @@ const AgendaCompleta = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Modal WhatsApp */}
+        <WhatsAppTemplateSelector
+          isOpen={showWhatsAppModal}
+          onClose={() => {
+            setShowWhatsAppModal(false)
+            setSelectedAppointmentForWhatsApp(null)
+          }}
+          appointment={selectedAppointmentForWhatsApp}
+          onSend={() => {
+            console.log('✅ WhatsApp enviado com sucesso')
+          }}
+        />
       </div>
     </div>
   )
