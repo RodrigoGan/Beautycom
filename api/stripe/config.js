@@ -13,11 +13,12 @@ const STRIPE_CONFIG = {
 const PLAN_MAPPING = {
   'basic': 'price_1S43Q6Gdt04aH4j03KJt0wXk', // BeautyTime Start
   'premium': 'price_1S43SfGdt04aH4j0kT3Raqih', // BeautyTime Pro
-  'plus': 'price_1S43UTGdt04aH4j0SxLDFbtC', // BeautyTime Plus
+  'enterprise': 'price_1S43UTGdt04aH4j0SxLDFbtC', // BeautyTime Plus
   'additional': 'price_1S43VlGdt04aH4j0Wohp1FgE', // BeautyTime Ad
   // Aliases para compatibilidade
   'start': 'price_1S43Q6Gdt04aH4j03KJt0wXk',
-  'pro': 'price_1S43SfGdt04aH4j0kT3Raqih'
+  'pro': 'price_1S43SfGdt04aH4j0kT3Raqih',
+  'plus': 'price_1S43UTGdt04aH4j0SxLDFbtC'
 };
 
 export {

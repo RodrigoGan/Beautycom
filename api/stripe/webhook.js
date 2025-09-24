@@ -1,5 +1,8 @@
 const { stripe, STRIPE_CONFIG } = require('./config');
 const { createClient } = require('@supabase/supabase-js');
+const { logWebhookEvent, checkSystemHealth, sendAlert, trackPerformance } = require('./monitoring');
+// Importar funções de notificação (ajustar caminho conforme necessário)
+// const { handlePaymentSuccess, handlePaymentFailed, handleSubscriptionCanceled } = require('../../src/utils/notifications');
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -8,9 +11,36 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // Validar método HTTP
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Validar headers necessários
+  const sig = req.headers['stripe-signature'];
+  if (!sig) {
+    console.error('❌ Webhook signature não encontrada');
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
+
+  // Validar webhook secret
+  if (!STRIPE_CONFIG.webhookSecret) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET não configurado');
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
   try {
-    const sig = req.headers['stripe-signature'];
+    const startTime = Date.now();
     const payload = JSON.stringify(req.body);
+    const eventType = req.body?.type || 'unknown';
+    
+    console.log('🔄 Processando webhook:', eventType);
+
+    // Verificar saúde do sistema
+    const isHealthy = await checkSystemHealth();
+    if (!isHealthy) {
+      await sendAlert('system_health', 'Sistema com problemas de conectividade');
+    }
 
     // Verificar webhook signature
     let stripeEvent;
@@ -20,8 +50,10 @@ export default async function handler(req, res) {
         sig,
         STRIPE_CONFIG.webhookSecret
       );
+      console.log('✅ Webhook signature validada com sucesso');
     } catch (err) {
-      console.error('Erro na verificação do webhook:', err.message);
+      console.error('❌ Erro na verificação do webhook:', err.message);
+      await logWebhookEvent(eventType, 'signature_verification', 'error', err);
       return res.status(400).json({ error: 'Webhook signature verification failed' });
     }
 
@@ -55,40 +87,66 @@ export default async function handler(req, res) {
         console.log(`Evento não tratado: ${stripeEvent.type}`);
     }
 
+    // Log de sucesso
+    const endTime = Date.now();
+    trackPerformance('webhook_processing', startTime, endTime);
+    await logWebhookEvent(eventType, stripeEvent.id, 'success');
+    
     return res.status(200).json({ received: true });
 
   } catch (error) {
-    console.error('Erro no webhook:', error);
+    console.error('❌ Erro no webhook:', error);
+    await logWebhookEvent(eventType || 'unknown', 'webhook_error', 'error', error);
+    await sendAlert('webhook_error', `Erro no processamento do webhook: ${error.message}`, { error: error.message });
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 }
 
 // Handler para sessão de checkout completada
 async function handleCheckoutSessionCompleted(session) {
-  console.log('Checkout session completed:', session.id);
+  console.log('🔄 Processando checkout session completed:', session.id);
   
-  const userId = session.metadata.user_id;
-  const planType = session.metadata.plan_type;
-  
-  if (!userId) {
-    console.error('User ID não encontrado na sessão');
+  // Validar dados obrigatórios
+  if (!session.id) {
+    console.error('❌ Session ID não encontrado');
     return;
   }
 
-  // Atualizar status do usuário
-  const { error } = await supabase
-    .from('users')
-    .update({
-      subscription_status: 'active',
-      subscription_plan: planType,
-      subscription_started_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+  const userId = session.metadata?.user_id;
+  const planType = session.metadata?.plan_type;
+  
+  if (!userId) {
+    console.error('❌ User ID não encontrado na sessão');
+    return;
+  }
 
-  if (error) {
-    console.error('Erro ao atualizar usuário:', error);
-  } else {
-    console.log('Usuário atualizado com sucesso:', userId);
+  if (!planType) {
+    console.error('❌ Plan type não encontrado na sessão');
+    return;
+  }
+
+  console.log('✅ Dados validados:', { userId, planType });
+
+  // Atualizar status do usuário
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        subscription_status: 'active',
+        subscription_plan: planType,
+        subscription_started_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('❌ Erro ao atualizar usuário:', error);
+      throw error;
+    }
+    
+    console.log('✅ Usuário atualizado com sucesso:', userId);
+  } catch (updateError) {
+    console.error('❌ Falha crítica ao atualizar usuário:', updateError);
+    // Aqui você poderia implementar retry logic ou notificação de admin
   }
 }
 

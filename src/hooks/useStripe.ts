@@ -127,7 +127,9 @@ export const useStripe = () => {
       
       */
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('❌ Erro no createCheckoutSession:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -135,6 +137,8 @@ export const useStripe = () => {
 
   const activateTrial = async () => {
     try {
+      console.log('🔄 Ativando trial para usuário:', user?.id);
+      
       const { error } = await supabase
         .from('trials')
         .upsert({
@@ -144,7 +148,12 @@ export const useStripe = () => {
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dias
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro ao criar trial:', error);
+        throw error;
+      }
+
+      console.log('✅ Trial criado com sucesso');
 
       // Atualizar status do usuário
       const { error: userError } = await supabase
@@ -155,22 +164,34 @@ export const useStripe = () => {
         })
         .eq('id', user?.id);
 
-      if (userError) throw userError;
+      if (userError) {
+        console.error('❌ Erro ao atualizar usuário:', userError);
+        throw userError;
+      }
 
+      console.log('✅ Usuário atualizado com sucesso');
+      
       // Redirecionar para página de sucesso
       window.location.href = '/planos?trial=activated';
     } catch (err) {
-      throw new Error('Erro ao ativar trial');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao ativar trial';
+      console.error('❌ Erro no activateTrial:', errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
   const cancelSubscription = async () => {
-    if (!user) return;
+    if (!user) {
+      console.warn('⚠️ Usuário não autenticado para cancelar assinatura');
+      return false;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
+      console.log('🔄 Cancelando assinatura para usuário:', user.id);
+      
       const response = await fetch('/api/stripe/cancel-subscription', {
         method: 'POST',
         headers: {
@@ -183,15 +204,19 @@ export const useStripe = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao cancelar assinatura');
+        const errorMessage = errorData.error || 'Erro ao cancelar assinatura';
+        console.error('❌ Erro na resposta da API:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      console.log('Assinatura cancelada:', result);
+      console.log('✅ Assinatura cancelada com sucesso:', result);
 
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao cancelar assinatura');
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao cancelar assinatura';
+      console.error('❌ Erro no cancelSubscription:', errorMessage);
+      setError(errorMessage);
       return false;
     } finally {
       setLoading(false);
