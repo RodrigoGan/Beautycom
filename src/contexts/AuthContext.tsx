@@ -13,6 +13,8 @@ interface AuthContextType {
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
   signUp: (email: string, password: string, name: string, userType?: 'usuario' | 'profissional') => Promise<{ data: any; error: string }>
+  resetPassword: (email: string) => Promise<{ data: any; error: any }>
+  updatePassword: (newPassword: string) => Promise<{ data: any; error: any }>
   signOut: () => Promise<void>
   updateUser: (updates: Partial<User>) => Promise<void>
   syncUserType: () => Promise<void>
@@ -271,6 +273,76 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://beautycom.com.br/redefinir-senha',
+        data: {
+          site_name: 'Beautycom',
+          site_url: 'https://beautycom.com.br'
+        }
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Email de recuperação enviado!",
+        description: "Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.",
+      })
+
+      return { data, error: null }
+    } catch (error) {
+      console.error('❌ Erro na recuperação de senha:', error)
+      
+      let errorMessage = "Erro ao enviar email de recuperação"
+      
+      if (error instanceof Error) {
+        errorMessage = translateError(error.message)
+      }
+
+      toast({
+        title: "Erro na recuperação de senha",
+        description: errorMessage,
+        variant: "destructive"
+      })
+      
+      return { data: null, error }
+    }
+  }
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Senha atualizada!",
+        description: "Sua senha foi redefinida com sucesso.",
+      })
+
+      return { data, error: null }
+    } catch (error) {
+      console.error('❌ Erro ao atualizar senha:', error)
+      
+      let errorMessage = "Erro ao redefinir senha"
+      
+      if (error instanceof Error) {
+        errorMessage = translateError(error.message)
+      }
+
+      toast({
+        title: "Erro ao redefinir senha",
+        description: errorMessage,
+        variant: "destructive"
+      })
+      
+      return { data: null, error }
+    }
+  }
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
@@ -372,6 +444,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       loading, 
       signUp, 
       signIn, 
+      resetPassword,
+      updatePassword,
       signOut, 
       updateUser, 
       syncUserType,

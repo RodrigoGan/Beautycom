@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar Senha - Beautycom</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+        .title {
+            color: #EC4899;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+        .content {
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #EC4899, #F97316);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background: linear-gradient(135deg, #DB2777, #EA580C);
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .security-note {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #EC4899;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://beautycom.com.br/image/logotipobeautycom.png" alt="Beautycom" class="logo">
+            <h1 class="title">Recuperar Senha</h1>
+            <p class="subtitle">Beautycom - Rede Social da Beleza</p>
+        </div>
+        
+        <div class="content">
+            <p>Olá!</p>
+            
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta na Beautycom.</p>
+            
+            <p>Clique no botão abaixo para criar uma nova senha:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ .ConfirmationURL }}" class="button">Redefinir Senha</a>
+            </div>
+            
+            <div class="security-note">
+                <strong>⚠️ Importante:</strong>
+                <ul>
+                    <li>Este link é válido por 24 horas</li>
+                    <li>Se você não solicitou esta alteração, ignore este email</li>
+                    <li>Nunca compartilhe este link com outras pessoas</li>
+                </ul>
+            </div>
+            
+            <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+            <p style="word-break: break-all; background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace;">
+                {{ .ConfirmationURL }}
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>Este email foi enviado automaticamente pela Beautycom.</p>
+            <p>Se você não solicitou esta alteração, pode ignorar este email com segurança.</p>
+            <p><strong>Beautycom</strong> - Rede Social da Beleza</p>
+        </div>
+    </div>
+</body>
+</html>

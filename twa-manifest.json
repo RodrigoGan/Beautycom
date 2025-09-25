@@ -1,0 +1,50 @@
+{
+  "packageId": "br.com.beautycom.twa",
+  "host": "beautycom.com.br",
+  "name": "Beautycom - Rede Social da Beleza",
+  "launcherName": "Beautycom",
+  "display": "standalone",
+  "themeColor": "#EC4899",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://beautycom.com.br/icon-512x512.png",
+  "maskableIconUrl": "https://beautycom.com.br/icon-maskable-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "E:\\Beautycom\\beauty-spark-connect-main\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://beautycom.com.br/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://beautycom.com.br/",
+  "minSdkVersion": 21,
+  "orientation": "portrait-primary",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "appVersion": "1"
+}

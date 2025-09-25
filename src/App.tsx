@@ -14,6 +14,8 @@ import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import RecuperarSenha from "./pages/RecuperarSenha";
+import RedefinirSenha from "./pages/RedefinirSenha";
 import Cadastro from "./pages/Cadastro";
 import Perfil from "./pages/Perfil";
 import Membros from "./pages/Membros";
@@ -50,6 +52,8 @@ const App = () => {
             <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
             <Route path="/cadastro" element={<Cadastro />} />
             <Route path="/perfil" element={
               <ProtectedRoute>
