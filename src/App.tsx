@@ -32,7 +32,6 @@ import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
 import AreaAdministrativa from "./pages/AreaAdministrativa";
 import AdminWhatsApp from "./pages/AdminWhatsApp";
-import MigracaoFotosPage from "./pages/MigracaoFotosPage";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 
 const queryClient = new QueryClient();
@@ -115,11 +114,6 @@ const App = () => {
               </ProtectedRoute>
             } />
             <Route path="/salon/:id" element={<SalonProfile />} />
-            <Route path="/migracao-fotos" element={
-              <ProtectedRoute>
-                <MigracaoFotosPage />
-              </ProtectedRoute>
-            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
                       </Routes>
