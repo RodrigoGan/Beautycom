@@ -1088,34 +1088,8 @@ const MainPostsPreview = ({ userId }: { userId: string }) => {
   }
 
   if (mainPosts.length === 0) {
-    return (
-      <div className="grid grid-cols-3 gap-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="aspect-square bg-gradient-card rounded-lg border-2 border-dashed border-yellow-400/30 flex items-center justify-center group hover:border-yellow-400/50 transition-all duration-300">
-            <div className="text-center p-2">
-              <Star className="h-4 w-4 text-yellow-400/60 mx-auto mb-1" />
-              <p className="text-xs text-muted-foreground leading-tight">
-                {isOwnProfile ? (
-                  // Mensagens para o dono do perfil
-                  <>
-                    {i === 0 && "Escolha um post principal"}
-                    {i === 1 && "Destaque seu trabalho"}
-                    {i === 2 && "Selecione um post"}
-                  </>
-                ) : (
-                  // Mensagens para visitantes
-                  <>
-                    {i === 0 && "Este membro ainda"}
-                    {i === 1 && "não escolheu seus"}
-                    {i === 2 && "posts principais"}
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+    // Não exibir a seção de posts principais quando não há posts
+    return null
   }
 
   return (
@@ -1312,34 +1286,8 @@ const SalonMainPostsPreview = ({ salonId }: { salonId: string }) => {
   }
 
   if (mainPosts.length === 0) {
-    return (
-      <div className="grid grid-cols-3 gap-2">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="aspect-square bg-gradient-card rounded-lg border-2 border-dashed border-yellow-400/30 flex items-center justify-center group hover:border-yellow-400/50 transition-all duration-300">
-            <div className="text-center p-2">
-              <Star className="h-4 w-4 text-yellow-400/60 mx-auto mb-1" />
-              <p className="text-xs text-muted-foreground leading-tight">
-                {isOwnSalon ? (
-                  // Mensagens para o proprietário do salão
-                  <>
-                    {i === 0 && "Escolha um post principal"}
-                    {i === 1 && "Destaque o trabalho"}
-                    {i === 2 && "Selecione um post"}
-                  </>
-                ) : (
-                  // Mensagens para visitantes
-                  <>
-                    {i === 0 && "Este salão ainda"}
-                    {i === 1 && "não escolheu seus"}
-                    {i === 2 && "posts principais"}
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+    // Não exibir a seção de posts principais quando não há posts
+    return null
   }
 
   return (

@@ -15,7 +15,6 @@ import { useSalons } from "@/hooks/useSalons"
 import { useAgendaConfig } from "@/hooks/useAgendaConfig"
 import { useProfessionalServices } from "@/hooks/useProfessionalServices"
 import { useCategories } from "@/hooks/useCategories"
-import { useAgendaStatus } from "@/hooks/useAgendaStatus"
 import { useSubscriptionInfo } from "@/hooks/useSubscriptionInfo"
 import { useToast } from "@/hooks/use-toast"
 import { useEffect, useState } from "react"
@@ -27,21 +26,17 @@ const ConfiguracoesAgenda = () => {
   const { user } = useAuthContext()
   const { userSalon } = useSalons(user?.id)
   
-  // Hook para verificar status da agenda
-  const { hasActiveAgenda, loading: agendaStatusLoading } = useAgendaStatus(user?.id)
-  
   // Hook para verificar informações de assinatura
   const { subscriptionSummary } = useSubscriptionInfo(user?.id)
   
-  // Lógica de permissões melhorada
-  const canManageSettings = user?.user_type === 'profissional' && hasActiveAgenda
+  // Lógica de permissões melhorada - sempre permitir acesso às configurações para profissionais
+  const canManageSettings = user?.user_type === 'profissional'
   
   // Verificar tipo de profissional
   const isIndependentProfessional = user?.user_type === 'profissional' && !userSalon?.id
   const isSalonEmployee = user?.user_type === 'profissional' && userSalon?.id && userSalon?.owner_id !== user?.id
   const isSalonOwner = user?.user_type === 'profissional' && userSalon?.id && userSalon?.owner_id === user?.id
   
-  const permissionsLoading = agendaStatusLoading
   
   const { toast } = useToast()
   
@@ -535,7 +530,7 @@ const ConfiguracoesAgenda = () => {
   }
 
   // Verificar se pode gerenciar configurações
-  if (!permissionsLoading && !canManageSettings) {
+  if (!canManageSettings) {
     // Determinar tipo de mensagem baseado no tipo de profissional
     let title = "Permissão Insuficiente"
     let description = "Você não tem permissão para gerenciar configurações."
@@ -664,6 +659,7 @@ const ConfiguracoesAgenda = () => {
               // Recarregar dados após ativação
               window.location.reload()
             }}
+            showShareCard={true}
           />
 
           {/* Horário de Funcionamento */}

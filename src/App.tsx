@@ -18,6 +18,7 @@ import RecuperarSenha from "./pages/RecuperarSenha";
 import RedefinirSenha from "./pages/RedefinirSenha";
 import Cadastro from "./pages/Cadastro";
 import Perfil from "./pages/Perfil";
+import PerfilPublico from "./pages/PerfilPublico";
 import Membros from "./pages/Membros";
 import BeautyWall from "./pages/BeautyWall";
 import Planos from "./pages/Planos";
@@ -31,6 +32,7 @@ import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
 import AreaAdministrativa from "./pages/AreaAdministrativa";
 import AdminWhatsApp from "./pages/AdminWhatsApp";
+import MigracaoFotosPage from "./pages/MigracaoFotosPage";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 
 const queryClient = new QueryClient();
@@ -60,11 +62,8 @@ const App = () => {
                 <Perfil />
               </ProtectedRoute>
             } />
-            <Route path="/perfil/:userId" element={
-              <ProtectedRoute>
-                <Perfil />
-              </ProtectedRoute>
-            } />
+            <Route path="/perfil/:userId" element={<Perfil />} />
+            <Route path="/profissional/:userId" element={<PerfilPublico />} />
             <Route path="/membros" element={<Membros />} />
             <Route path="/beautywall" element={<BeautyWall />} />
             <Route path="/planos" element={<Planos />} />
@@ -116,6 +115,11 @@ const App = () => {
               </ProtectedRoute>
             } />
             <Route path="/salon/:id" element={<SalonProfile />} />
+            <Route path="/migracao-fotos" element={
+              <ProtectedRoute>
+                <MigracaoFotosPage />
+              </ProtectedRoute>
+            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
                       </Routes>
