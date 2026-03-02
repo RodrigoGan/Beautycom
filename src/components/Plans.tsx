@@ -158,7 +158,7 @@ export function Plans() {
               </p>
               <div className="text-center lg:text-left">
                 <p className="text-muted-foreground text-sm mb-4">
-                  ✨ Teste gratuito de 7 dias • Cancele quando quiser
+                  ✨ Teste gratuito de 30 dias • Cancele quando quiser
                 </p>
                 <Link to="/cadastro">
                   <Button variant="hero" size="xl">
