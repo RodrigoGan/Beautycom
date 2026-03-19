@@ -8,6 +8,15 @@ import { supabase } from "@/lib/supabase"
 import { User } from "@/lib/supabase"
 import { Users, Search, Loader2, ArrowLeft } from "lucide-react"
 import { Link } from "react-router-dom"
+import { useToast } from "@/hooks/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 
 type ExtendedUser = User & {
   subscription_status?: string
@@ -23,6 +32,11 @@ const AdminUsersProfessionals = () => {
   const [cityFilter, setCityFilter] = useState("")
   const [stateFilter, setStateFilter] = useState("")
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [subscriptionModalUser, setSubscriptionModalUser] = useState<ExtendedUser | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<"start" | "pro" | "plus">("start")
+  const [durationDays, setDurationDays] = useState(30)
+  const [savingSubscription, setSavingSubscription] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -87,6 +101,170 @@ const AdminUsersProfessionals = () => {
 
   const filteredProfessionalsCount = filtered.filter((u) => u.user_type === "profissional").length
   const filteredRegularUsersCount = filtered.filter((u) => u.user_type === "usuario").length
+
+  const handleOpenSubscriptionModal = (user: ExtendedUser) => {
+    setSubscriptionModalUser(user)
+    setSelectedPlan("start")
+    setDurationDays(30)
+  }
+
+  const handleSaveSubscription = async () => {
+    if (!subscriptionModalUser) return
+
+    try {
+      setSavingSubscription(true)
+
+      const now = new Date()
+      const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000)
+
+      // Registrar em trials como controle de validade
+      const { error: trialError } = await supabase
+        .from("trials")
+        .upsert({
+          user_id: subscriptionModalUser.id,
+          plan_type: selectedPlan,
+          status: "active",
+          expires_at: expiresAt.toISOString()
+        })
+
+      if (trialError) {
+        console.error("Erro ao registrar trial manual:", trialError)
+        toast({
+          title: "Erro ao salvar assinatura",
+          description: "Não foi possível registrar o período de validade.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Atualizar campos resumidos do usuário
+      const planNameMap: Record<string, string> = {
+        start: "BeautyTime Start",
+        pro: "BeautyTime Pro",
+        plus: "BeautyTime Plus"
+      }
+
+      const { error: userError } = await supabase
+        .from("users")
+        .update({
+          subscription_status: "active",
+          subscription_plan: planNameMap[selectedPlan] || selectedPlan,
+          trial_activated_at: now.toISOString() // reaproveita campo existente para registrar início
+        })
+        .eq("id", subscriptionModalUser.id)
+
+      if (userError) {
+        console.error("Erro ao atualizar usuário com assinatura manual:", userError)
+        toast({
+          title: "Erro ao salvar assinatura",
+          description: "Ocorreu um erro ao atualizar os dados do usuário.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      toast({
+        title: "Assinatura ativada",
+        description: `Plano ${planNameMap[selectedPlan]} ativado por ${durationDays} dias.`
+      })
+
+      // Atualizar estado local para refletir mudança
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === subscriptionModalUser.id
+            ? { ...u, subscription_status: "active", subscription_plan: planNameMap[selectedPlan] || selectedPlan }
+            : u
+        )
+      )
+      setFiltered((prev) =>
+        prev.map((u) =>
+          u.id === subscriptionModalUser.id
+            ? { ...u, subscription_status: "active", subscription_plan: planNameMap[selectedPlan] || selectedPlan }
+            : u
+        )
+      )
+
+      setSubscriptionModalUser(null)
+    } catch (error) {
+      console.error("Erro inesperado ao salvar assinatura manual:", error)
+      toast({
+        title: "Erro inesperado",
+        description: "Tente novamente em alguns instantes.",
+        variant: "destructive"
+      })
+    } finally {
+      setSavingSubscription(false)
+    }
+  }
+
+  const handleCancelSubscription = async (targetUser: ExtendedUser) => {
+    try {
+      setSavingSubscription(true)
+
+      // Marcar trial/assinatura manual como expirada no controle de validade
+      const { error: trialError } = await supabase
+        .from("trials")
+        .update({
+          status: "expired",
+          expires_at: new Date().toISOString()
+        })
+        .eq("user_id", targetUser.id)
+        .eq("status", "active")
+
+      if (trialError) {
+        console.error("Erro ao expirar trial manual:", trialError)
+      }
+
+      // Atualizar usuário para assinatura inativa
+      const { error: userError } = await supabase
+        .from("users")
+        .update({
+          subscription_status: "inactive",
+          subscription_plan: null
+        })
+        .eq("id", targetUser.id)
+
+      if (userError) {
+        console.error("Erro ao cancelar assinatura no usuário:", userError)
+        toast({
+          title: "Erro ao cancelar assinatura",
+          description: "Não foi possível atualizar os dados do usuário.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      toast({
+        title: "Assinatura cancelada",
+        description: "A assinatura manual foi encerrada com sucesso."
+      })
+
+      // Atualizar estado local para refletir mudança
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === targetUser.id
+            ? { ...u, subscription_status: "inactive", subscription_plan: undefined }
+            : u
+        )
+      )
+      setFiltered((prev) =>
+        prev.map((u) =>
+          u.id === targetUser.id
+            ? { ...u, subscription_status: "inactive", subscription_plan: undefined }
+            : u
+        )
+      )
+    } catch (error) {
+      console.error("Erro inesperado ao cancelar assinatura manual:", error)
+      toast({
+        title: "Erro inesperado",
+        description: "Tente novamente em alguns instantes.",
+        variant: "destructive"
+      })
+    } finally {
+      setSavingSubscription(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -264,6 +442,30 @@ const AdminUsersProfessionals = () => {
                                     {u.cidade || "-"} {u.uf ? `- ${u.uf}` : ""}
                                   </p>
                                 </div>
+                                {u.user_type === "profissional" && (
+                                  <div className="md:col-span-3 mt-2 flex justify-end">
+                                    <div className="flex gap-2">
+                                      {u.subscription_status === "active" ? (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          disabled={savingSubscription}
+                                          onClick={() => handleCancelSubscription(u)}
+                                        >
+                                          {savingSubscription ? "Cancelando..." : "Cancelar assinatura manual"}
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleOpenSubscriptionModal(u)}
+                                        >
+                                          Ativar assinatura manual
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -283,6 +485,78 @@ const AdminUsersProfessionals = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!subscriptionModalUser} onOpenChange={() => !savingSubscription && setSubscriptionModalUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ativar assinatura manual</DialogTitle>
+            <DialogDescription>
+              Escolha um plano e o período de validade para ativar a assinatura deste profissional.
+            </DialogDescription>
+          </DialogHeader>
+          {subscriptionModalUser && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <p className="font-medium">{subscriptionModalUser.name || subscriptionModalUser.email}</p>
+                <p className="text-muted-foreground text-xs">{subscriptionModalUser.email}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Plano</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {([
+                    { id: "start", label: "BeautyTime Start" },
+                    { id: "pro", label: "BeautyTime Pro" },
+                    { id: "plus", label: "BeautyTime Plus" }
+                  ] as const).map((plan) => (
+                    <Button
+                      key={plan.id}
+                      type="button"
+                      size="sm"
+                      variant={selectedPlan === plan.id ? "hero" : "outline"}
+                      onClick={() => setSelectedPlan(plan.id)}
+                    >
+                      {plan.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 max-w-xs">
+                <Label className="text-xs">Duração (dias)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={durationDays}
+                  onChange={(e) => setDurationDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                  className="h-8 text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  A assinatura será considerada ativa para campanhas e relatórios durante este período.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={savingSubscription}
+                  onClick={() => setSubscriptionModalUser(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveSubscription}
+                  disabled={savingSubscription}
+                >
+                  {savingSubscription ? "Salvando..." : "Ativar assinatura"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
