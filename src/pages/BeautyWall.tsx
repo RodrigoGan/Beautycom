@@ -648,6 +648,43 @@ const BeautyWall = () => {
     }
   }
 
+  // Função para clique na mídia do post
+  const handleMediaClick = (post: any) => {
+    if (!user) {
+      setSelectedPost({ ...post, type: 'post' })
+      setShowLoginModal(true)
+      return
+    }
+
+    // Vídeo abre no modal de vídeo
+    if (post.isVideo) {
+      handleVideoClick(post.imagem)
+      return
+    }
+
+    // Post antes/depois abre no modal de comparação (iniciando em "depois")
+    if (post.isBeforeAfter && post.beforeUrl && post.afterUrl) {
+      handleImageClick(post.afterUrl, 'DEPOIS', 'after', post.beforeUrl, post.afterUrl)
+      return
+    }
+
+    // Carrossel permanece com navegação local no card
+    if (post.isCarousel) {
+      return
+    }
+
+    // Post simples: abre imagem ampliada
+    if (post.imagem && post.imagem !== "/placeholder-post.jpg") {
+      setBeforeAfterImages(null)
+      setSelectedImage({
+        url: post.imagem,
+        label: 'IMAGEM',
+        type: 'after'
+      })
+      setShowImageModal(true)
+    }
+  }
+
   // Função para abrir modal de comentários
   const handleOpenCommentModal = (post: any) => {
     if (!user) {
@@ -1085,7 +1122,7 @@ const BeautyWall = () => {
                 {/* Mídia do Post */}
                 <div 
                   className="aspect-square bg-gradient-card cursor-pointer overflow-hidden"
-                  onClick={() => handlePostClick(post, 'post')}
+                  onClick={() => handleMediaClick(post)}
                 >
                   {post.imagem && post.imagem !== "/placeholder-post.jpg" ? (
                     post.isBeforeAfter ? (
@@ -1537,22 +1574,37 @@ const BeautyWall = () => {
       )}
 
       {/* Modal para imagem ampliada */}
-      <Dialog open={showImageModal} onOpenChange={setShowImageModal}>
+      <Dialog
+        open={showImageModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseImageModal()
+          } else {
+            setShowImageModal(true)
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-none w-full h-full max-h-none p-0 bg-black/95">
-          <div className="relative w-full h-full flex flex-col">
+          <div className="relative w-full h-full min-h-0 flex flex-col">
             {/* Header do modal */}
             <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-sm">
               <div className="flex items-center gap-3">
-                <Badge 
-                  variant="outline" 
-                  className={`text-sm font-semibold ${
-                    carouselPosition === 0 
-                      ? 'bg-red-500 text-white border-red-500' 
-                      : 'bg-green-500 text-white border-green-500'
-                  }`}
-                >
-                  {carouselPosition === 0 ? 'ANTES' : 'DEPOIS'}
-                </Badge>
+                {beforeAfterImages ? (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-sm font-semibold ${
+                      carouselPosition === 0 
+                        ? 'bg-red-500 text-white border-red-500' 
+                        : 'bg-green-500 text-white border-green-500'
+                    }`}
+                  >
+                    {carouselPosition === 0 ? 'ANTES' : 'DEPOIS'}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-sm font-semibold bg-primary text-white border-primary">
+                    IMAGEM
+                  </Badge>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -1568,7 +1620,7 @@ const BeautyWall = () => {
 
             {/* Carrossel de imagens */}
             <div 
-              className="flex-1 relative overflow-hidden"
+              className="flex-1 min-h-0 relative overflow-hidden"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -1582,11 +1634,11 @@ const BeautyWall = () => {
                   }}
                 >
                   {/* Imagem ANTES */}
-                  <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+                  <div className="w-full h-full min-h-0 flex-shrink-0 flex items-center justify-center p-4">
                     <img 
                       src={beforeAfterImages.before.url} 
                       alt="Antes"
-                      className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                      className="w-full h-full object-contain rounded-lg shadow-2xl"
                       loading="lazy"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
@@ -1596,11 +1648,11 @@ const BeautyWall = () => {
                   </div>
                   
                   {/* Imagem DEPOIS */}
-                  <div className="w-full h-full flex-shrink-0 flex items-center justify-center p-4">
+                  <div className="w-full h-full min-h-0 flex-shrink-0 flex items-center justify-center p-4">
                     <img 
                       src={beforeAfterImages.after.url} 
                       alt="Depois"
-                      className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                      className="w-full h-full object-contain rounded-lg shadow-2xl"
                       loading="lazy"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
@@ -1611,7 +1663,23 @@ const BeautyWall = () => {
                 </div>
               )}
 
+              {!beforeAfterImages && selectedImage && (
+                <div className="w-full h-full min-h-0 flex items-center justify-center p-4">
+                  <img
+                    src={selectedImage.url}
+                    alt={selectedImage.label || "Imagem do post"}
+                    className="w-full h-full object-contain rounded-lg shadow-2xl"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      console.error('Erro ao carregar imagem no modal:', selectedImage.url)
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Setas de navegação (apenas em telas maiores) */}
+              {beforeAfterImages && (
               <div className="absolute inset-0 pointer-events-none hidden md:block">
                 {/* Seta esquerda */}
                 <button
@@ -1639,16 +1707,25 @@ const BeautyWall = () => {
                   </svg>
                 </button>
               </div>
+              )}
             </div>
 
             {/* Footer do modal */}
             <div className="p-4 bg-black/50 backdrop-blur-sm text-center">
-              <p className="text-white/80 text-sm md:hidden">
-                Deslize para comparar as imagens
-              </p>
-              <p className="text-white/80 text-sm hidden md:block">
-                Use as setas para navegar
-              </p>
+              {beforeAfterImages ? (
+                <>
+                  <p className="text-white/80 text-sm md:hidden">
+                    Deslize para comparar as imagens
+                  </p>
+                  <p className="text-white/80 text-sm hidden md:block">
+                    Use as setas para navegar
+                  </p>
+                </>
+              ) : (
+                <p className="text-white/80 text-sm">
+                  Toque fora da imagem ou no X para fechar
+                </p>
+              )}
             </div>
           </div>
         </DialogContent>
