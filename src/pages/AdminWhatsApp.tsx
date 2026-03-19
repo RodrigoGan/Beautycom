@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Link } from 'react-router-dom'
 import { 
   MessageSquare, 
   Users, 
@@ -21,7 +22,8 @@ import {
   Play,
   RotateCcw,
   Square,
-  Calendar
+  Calendar,
+  ArrowLeft
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/contexts/AuthContext'
@@ -456,11 +458,19 @@ Equipe Beautycom ✨`
     <div className="min-h-screen bg-gradient-subtle">
       <Header />
       <div className="pt-20 pb-8 container mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">📱 Campanhas WhatsApp</h1>
-          <p className="text-muted-foreground">
-            Gerencie e envie mensagens em massa para profissionais
-          </p>
+        <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">📱 Campanhas WhatsApp</h1>
+            <p className="text-muted-foreground">
+              Gerencie e envie mensagens em massa para profissionais
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/admin">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar para Admin
+            </Link>
+          </Button>
         </div>
 
         {/* Tabs de Navegação */}

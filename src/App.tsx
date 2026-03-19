@@ -32,6 +32,9 @@ import CriarSalon from "./pages/CriarSalon";
 import SalonProfile from "./pages/SalonProfile";
 import AreaAdministrativa from "./pages/AreaAdministrativa";
 import AdminWhatsApp from "./pages/AdminWhatsApp";
+import AdminHome from "./pages/AdminHome";
+import AdminUsersProfessionals from "./pages/AdminUsersProfessionals";
+import AdminReports from "./pages/AdminReports";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 
 const queryClient = new QueryClient();
@@ -79,6 +82,27 @@ const App = () => {
             <Route path="/area-administrativa" element={
               <ProtectedRoute>
                 <AreaAdministrativa />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminHome />
+                </SuperAdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminUsersProfessionals />
+                </SuperAdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/reports" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminReports />
+                </SuperAdminRoute>
               </ProtectedRoute>
             } />
             <Route path="/admin/whatsapp-campaigns" element={
